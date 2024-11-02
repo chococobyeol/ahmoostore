@@ -16,10 +16,10 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
+    setFormData(prev => ({
+      ...prev,
       [e.target.name]: e.target.value,
-    });
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -27,7 +27,6 @@ export default function RegisterPage() {
     setError('');
     setLoading(true);
 
-    // 기본 유효성 검사
     if (formData.password !== formData.passwordConfirm) {
       setError('비밀번호가 일치하지 않습니다.');
       setLoading(false);
@@ -35,16 +34,12 @@ export default function RegisterPage() {
     }
 
     try {
-      const result = await registerUser({
+      await registerUser({
         username: formData.username,
         email: formData.email,
         password: formData.password,
       });
-      
-      console.log('회원가입 완료:', result);
-      
-      // 회원가입 성공 시 홈페이지로 이동
-      router.push('/');  // 또는 router.push('/login'); 로그인 페이지로 이동
+      router.push('/');
     } catch (error: any) {
       setError(error.message);
     } finally {

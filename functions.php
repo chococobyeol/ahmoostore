@@ -1,26 +1,5 @@
 <?php
 
-// 회원가입 폼 커스터마이즈
-add_filter('register_form', 'custom_registration_form');
-function custom_registration_form() {
-    // 추가 필드 예시
-    ?>
-    <p>
-        <label for="phone">전화번호</label>
-        <input type="tel" name="phone" id="phone" class="input" />
-    </p>
-    <?php
-}
-
-// 회원가입 처리 시 추가 필드 저장
-add_action('user_register', 'save_custom_registration_fields');
-function save_custom_registration_fields($user_id) {
-    if (!empty($_POST['phone'])) {
-        update_user_meta($user_id, 'phone', sanitize_text_field($_POST['phone']));
-    }
-}
-
-// REST API 사용자 등록 엔드포인트 추가
 add_action('rest_api_init', function () {
     register_rest_route('custom/v1', '/register', array(
         'methods' => 'POST',
@@ -56,7 +35,6 @@ function register_user_api($request) {
         return $user_id;
     }
 
-    // 기본 역할을 customer로 설정
     $user = new WP_User($user_id);
     $user->set_role('customer');
 
@@ -66,7 +44,6 @@ function register_user_api($request) {
     );
 }
 
-// CORS 허용
 add_action('init', function() {
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
