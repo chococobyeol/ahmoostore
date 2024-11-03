@@ -1,17 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 export default function UserMenuSidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    
+    return () => {
+      setMounted(false);
+    };
+  }, []);
+
+  const handleClick = () => {
+    setIsOpen(true);
+  };
 
   return (
     <>
       {/* 햄버거 버튼 */}
       <button
-        onClick={() => setIsOpen(true)}
-        className="fixed left-4 top-4 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 z-30"
+        onClick={handleClick}
+        className="fixed left-4 top-4 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 z-[100]"
       >
         <div className="relative">
           <svg
@@ -33,7 +46,7 @@ export default function UserMenuSidebar() {
 
       {/* 사이드바 */}
       <div
-        className={`fixed left-0 top-0 h-full w-96 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
+        className={`fixed left-0 top-0 h-full w-96 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-[100] ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
