@@ -2,13 +2,18 @@
 
 import { useCart } from '@/context/CartContext';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
-export function CartSidebar() {
+export default function CartSidebar() {
   const { items, removeFromCart, updateQuantity } = useCart();
   const [isOpen, setIsOpen] = useState(false);
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const total = items.reduce((sum, item) => sum + parseInt(item.price) * item.quantity, 0);
 
@@ -16,6 +21,10 @@ export function CartSidebar() {
     setIsOpen(false);
     router.push('/checkout');
   };
+
+  if (!mounted) {
+    return null;
+  }
 
   return (
     <>

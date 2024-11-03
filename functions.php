@@ -12,6 +12,21 @@ add_action('rest_api_init', function () {
         'callback' => 'login_user_api',
         'permission_callback' => '__return_true'
     ));
+
+    register_rest_route('custom/v1', '/update-order-status', array(
+        'methods' => ['POST', 'OPTIONS'],
+        'callback' => 'update_order_status_api',
+        'permission_callback' => '__return_true',
+        'args' => array(
+            'order_id' => array(
+                'required' => true,
+                'type' => 'string',
+                'validate_callback' => function($param) {
+                    return !empty($param);
+                }
+            )
+        )
+    ));
 });
 
 function register_user_api($request) {
@@ -59,7 +74,7 @@ function login_user_api($request) {
     if (is_wp_error($user)) {
         return new WP_Error(
             'login_failed',
-            '아이디 또는 비밀번호가 올바르지 않습니다.',
+            '아이디 또는 비밀번가 올바르지 않습니다.',
             array('status' => 401)
         );
     }
@@ -74,6 +89,43 @@ function login_user_api($request) {
             'displayName' => $user->display_name
         )
     );
+}
+
+function update_order_status_api($request) {
+    $json = $request->get_json_params();
+    $order_id = isset($json['order_id']) ? sanitize_text_field($json['order_id']) : '';
+    
+    if (empty($order_id)) {
+        return new WP_Error('no_order_id', '주문 ID가 필요합니다.', array('status' => 400));
+    }
+
+    if (!class_exists('WooCommerce')) {
+        return new WP_Error('woocommerce_required', 'WooCommerce가 필요합니다.', array('status' => 500));
+    }
+
+    $order = wc_get_order($order_id);
+    
+    if (!$order) {
+        return new WP_Error('invalid_order', '유효하지 않은 주문입니다.', array('status' => 404));
+    }
+
+    try {
+        $order->update_status('processing', '토스페이먼츠 결제 완료');
+        wc_reduce_stock_levels($order_id);
+        
+        return array(
+            'success' => true,
+            'message' => '주문 상태가 업데이트되었습니다.',
+            'order_id' => $order_id,
+            'new_status' => $order->get_status()
+        );
+    } catch (Exception $e) {
+        return new WP_Error(
+            'update_failed',
+            '주문 상태 업데이트 실패: ' . $e->getMessage(),
+            array('status' => 500)
+        );
+    }
 }
 
 add_action('init', function() {
@@ -92,9 +144,15 @@ add_action('rest_api_init', function() {
     remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
     add_filter('rest_pre_serve_request', function($value) {
         header("Access-Control-Allow-Origin: http://localhost:3000");
-        header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
-        header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With");
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type");
         header("Access-Control-Allow-Credentials: true");
+
+        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+            status_header(200);
+            exit();
+        }
+
         return $value;
-    });
-}, 15); 
+    }, 15);
+}); 

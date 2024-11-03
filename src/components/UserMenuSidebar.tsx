@@ -1,24 +1,33 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 
 export default function UserMenuSidebar() {
   const [isOpen, setIsOpen] = useState(false);
   const { isLoggedIn, user, logout } = useAuth();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleLogout = () => {
     logout();
     setIsOpen(false);
   };
 
+  if (!mounted) {
+    return null;
+  }
+
   return (
     <>
       {/* 햄버거 버튼 */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed left-4 top-4 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 z-[100]"
+        className="fixed left-4 top-4 bg-blue-500 text-white p-4 rounded-full shadow-lg hover:bg-blue-600 z-30"
       >
         <div className="relative">
           <svg
@@ -38,9 +47,17 @@ export default function UserMenuSidebar() {
         </div>
       </button>
 
+      {/* 사이드바 오버레이 */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 z-40" 
+          onClick={() => setIsOpen(false)} 
+        />
+      )}
+
       {/* 사이드바 */}
       <div
-        className={`fixed left-0 top-0 h-full w-96 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-[100] ${
+        className={`fixed left-0 top-0 h-full w-96 bg-white shadow-lg transform transition-transform duration-300 ease-in-out z-50 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
