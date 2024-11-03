@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from '@/context/CartContext';
 import { CartSidebar } from '@/components/CartSidebar';
 import UserMenuSidebar from '@/components/UserMenuSidebar';
+import { AuthProvider } from '@/context/AuthContext';
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -34,11 +35,13 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-white`}
       >
-        <CartProvider>
-          <UserMenuSidebar />
-          <CartSidebar />
-          {children}
-        </CartProvider>
+        <AuthProvider>
+          <CartProvider>
+            <UserMenuSidebar />
+            <CartSidebar />
+            {children}
+          </CartProvider>
+        </AuthProvider>
       </body>
     </html>
   );

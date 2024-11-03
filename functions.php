@@ -6,6 +6,12 @@ add_action('rest_api_init', function () {
         'callback' => 'register_user_api',
         'permission_callback' => '__return_true'
     ));
+
+    register_rest_route('custom/v1', '/login', array(
+        'methods' => 'POST',
+        'callback' => 'login_user_api',
+        'permission_callback' => '__return_true'
+    ));
 });
 
 function register_user_api($request) {
@@ -41,6 +47,32 @@ function register_user_api($request) {
     return array(
         'status' => 'success',
         'message' => '회원가입이 완료되었습니다.'
+    );
+}
+
+function login_user_api($request) {
+    $username = $request['username'];
+    $password = $request['password'];
+
+    $user = wp_authenticate($username, $password);
+
+    if (is_wp_error($user)) {
+        return new WP_Error(
+            'login_failed',
+            '아이디 또는 비밀번호가 올바르지 않습니다.',
+            array('status' => 401)
+        );
+    }
+
+    return array(
+        'status' => 'success',
+        'message' => '로그인 성공',
+        'user' => array(
+            'id' => $user->ID,
+            'username' => $user->user_login,
+            'email' => $user->user_email,
+            'displayName' => $user->display_name
+        )
     );
 }
 
