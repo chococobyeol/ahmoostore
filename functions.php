@@ -77,12 +77,24 @@ function login_user_api($request) {
 }
 
 add_action('init', function() {
-    header("Access-Control-Allow-Origin: *");
-    header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type");
+    header("Access-Control-Allow-Origin: http://localhost:3000");
+    header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
+    header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With");
+    header("Access-Control-Allow-Credentials: true");
     
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
         status_header(200);
         exit();
     }
-}); 
+});
+
+add_action('rest_api_init', function() {
+    remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
+    add_filter('rest_pre_serve_request', function($value) {
+        header("Access-Control-Allow-Origin: http://localhost:3000");
+        header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With");
+        header("Access-Control-Allow-Credentials: true");
+        return $value;
+    });
+}, 15); 

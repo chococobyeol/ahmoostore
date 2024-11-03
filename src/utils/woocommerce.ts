@@ -93,18 +93,52 @@ export const get = async (endpoint: string, config: RequestConfig = {}, useOrder
 export const createOrder = async (orderData: any): Promise<WooCommerceOrder> => {
   const endpoint = '/wp-json/wc/v3/orders';
   const fullUrl = `${baseURL}${endpoint}`;
+  
+  if (!orderKey || !orderSecret) {
+    console.error('주문 API 키가 설정되지 않았습니다:', { orderKey, orderSecret });
+    throw new Error('주문 API 키가 설정되지 않았습니다.');
+  }
+
   const oauthHeader = getOAuthHeader(fullUrl, 'POST', orderKey!, orderSecret!);
   
   try {
-    const response = await api.post(endpoint, orderData, {
+    console.log('주문 생성 요청 정보:', {
+      url: fullUrl,
+      baseURL,
+      endpoint,
+      orderKey,
+      orderSecret,
+      data: orderData,
       headers: {
         ...oauthHeader,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     });
+
+    const response = await axios({
+      method: 'POST',
+      url: fullUrl,
+      data: orderData,
+      headers: {
+        ...oauthHeader,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      withCredentials: true
+    });
+
+    console.log('주문 생성 응답:', response.data);
     return response.data;
-  } catch (error) {
-    console.error('주문 생성 오류:', error);
+  } catch (error: any) {
+    console.error('주문 생성 상세 오류:', {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      request: error.request,
+      config: error.config,
+      stack: error.stack
+    });
     throw error;
   }
 };

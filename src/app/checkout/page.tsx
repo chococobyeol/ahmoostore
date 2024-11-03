@@ -3,7 +3,8 @@
 import { useCart } from '@/context/CartContext';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { createOrder, waitForOrderCompletion } from '@/utils/woocommerce';
+import { createOrder } from '@/utils/woocommerce';
+import { loadTossPayments } from '@tosspayments/payment-sdk';
 
 interface OrderForm {
   name: string;
@@ -20,6 +21,7 @@ interface OrderForm {
 export default function CheckoutPage() {
   const { items, clearCart } = useCart();
   const router = useRouter();
+  const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState<OrderForm>({
     name: '',
     email: '',
@@ -49,57 +51,99 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    if (!form.address) {
+      alert('배송지 주소를 입력해주세요.');
+      return;
+    }
+
     try {
-      const order = await createOrder({
+      setIsLoading(true);
+      console.log('주문 시작 - 폼 데이터:', form);
+      console.log('주문 시작 - 상품 목록:', items);
+
+      // 주문 생성
+      const orderData = {
         payment_method: "simplepay",
         payment_method_title: "Simple Pay",
+        set_paid: false,
+        status: "pending",
         billing: {
           first_name: form.name,
           email: form.email,
           phone: form.phone,
           address_1: `[${form.postcode}] ${form.address}`,
           address_2: form.addressDetail,
+          country: form.isInternational ? form.country : 'KR',
         },
         shipping: {
           first_name: form.name,
           address_1: `[${form.postcode}] ${form.address}`,
           address_2: form.addressDetail,
+          country: form.isInternational ? form.country : 'KR',
         },
         line_items: items.map(item => ({
           product_id: item.id,
           quantity: item.quantity
         })),
-        customer_note: form.message
-      });
+        customer_note: form.message,
+        meta_data: [
+          {
+            key: "is_paid",
+            value: "false"
+          }
+        ]
+      };
 
-      if (order.payment_url) {
-        const paymentWindow = window.open('', 'payment_window', 'width=800,height=800,scrollbars=yes');
-        
-        if (paymentWindow) {
-          paymentWindow.location.href = order.payment_url;
-          
-          const checkPaymentWindow = setInterval(async () => {
-            if (paymentWindow.closed) {
-              clearInterval(checkPaymentWindow);
-              const isCompleted = await waitForOrderCompletion(order.id);
-              if (isCompleted) {
-                clearCart();
-                router.push(`/order-success?order_id=${order.id}`);
-              } else {
-                alert('결제가 완료되지 않았습니다. 다시 시도해주세요.');
-              }
-            }
-          }, 500);
-        } else {
-          alert('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.');
-          window.location.href = order.payment_url;
+      console.log('주문 요청 데이터:', JSON.stringify(orderData, null, 2));
+      
+      try {
+        const order = await createOrder(orderData);
+        console.log('주문 생성 성공:', order);
+
+        // 토스페이먼츠 결제 시작
+        const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+        if (!clientKey) {
+          throw new Error('토스페이먼츠 클라이언트 키가 설정되지 않았습니다.');
         }
-      } else {
-        throw new Error('결제 URL을 찾을 수 없습니다.');
+
+        const tossPayments = await loadTossPayments(clientKey);
+        
+        const orderId = `ORDER-${order.id}-${Date.now()}`;
+        
+        await tossPayments.requestPayment('카드', {
+          amount: total,
+          orderId: orderId,
+          orderName: `아무스토어 주문 #${order.id}`,
+          customerName: form.name || '고객',
+          successUrl: `${window.location.origin}/payments/success?orderId=${order.id}`,
+          failUrl: `${window.location.origin}/payments/fail`,
+        });
+      } catch (orderError: any) {
+        console.error('주문 생성 실패 상세:', {
+          message: orderError.message,
+          response: orderError.response?.data,
+          status: orderError.response?.status,
+          config: orderError.config,
+          stack: orderError.stack,
+          headers: orderError.response?.headers,
+          request: orderError.request,
+          fullError: orderError
+        });
+        throw new Error(orderError.response?.data?.message || '주문 생성에 실패했습니다.');
       }
-    } catch (error) {
-      console.error('Order creation error:', error);
-      alert('주문 생성 중 오류가 발생했습니다. 다시 시도해주세요.');
+
+    } catch (error: any) {
+      console.error('결제 처리 오류 상세:', {
+        name: error.name,
+        message: error.message,
+        stack: error.stack,
+        response: error.response,
+        request: error.request,
+        fullError: error
+      });
+      alert(error.message || '주문 처리 중 오류가 발생했습니다. 다시 시도해주세요.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
