@@ -1,10 +1,11 @@
 'use client';
 
 import { useCart } from '@/context/CartContext';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { createOrder } from '@/utils/woocommerce';
 import { loadTossPayments } from '@tosspayments/payment-sdk';
+import { useAuth } from '@/context/AuthContext';
 
 interface OrderForm {
   name: string;
@@ -21,10 +22,11 @@ interface OrderForm {
 export default function CheckoutPage() {
   const { items, clearCart } = useCart();
   const router = useRouter();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [form, setForm] = useState<OrderForm>({
     name: '',
-    email: '',
+    email: user?.email || '',
     phone: '',
     isInternational: false,
     country: 'KR',
@@ -33,6 +35,16 @@ export default function CheckoutPage() {
     postcode: '',
     message: ''
   });
+
+  useEffect(() => {
+    if (!user) {
+      router.push('/login?redirect=/checkout');
+    }
+  }, [user, router]);
+
+  if (!user) {
+    return null;
+  }
 
   const total = items.reduce((sum, item) => sum + parseInt(item.price) * item.quantity, 0);
 
@@ -83,7 +95,6 @@ export default function CheckoutPage() {
         },
         line_items: items.map(item => ({
           product_id: item.id,
-          quantity: item.quantity
         })),
         customer_note: form.message,
         meta_data: [
@@ -204,9 +215,9 @@ export default function CheckoutPage() {
               type="email"
               name="email"
               value={form.email}
-              onChange={handleChange}
+              readOnly
               required
-              className="w-full border rounded-lg px-4 py-2"
+              className="w-full border rounded-lg px-4 py-2 bg-gray-50"
             />
           </div>
           
@@ -333,14 +344,17 @@ export default function CheckoutPage() {
             />
           </div>
 
-          <button
-            type="submit"
-            className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600 mt-8"
-          >
-            결제하기
-          </button>
+          <div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full bg-blue-500 text-white py-3 rounded-lg hover:bg-blue-600"
+            >
+              {isLoading ? '처리중...' : '주문하기'}
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
-} 
+}
