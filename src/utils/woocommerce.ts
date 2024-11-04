@@ -205,7 +205,18 @@ export const getProducts = async () => {
     }
 
     const data = await response.json();
-    return data;
+    
+    // 받아온 데이터 확인
+    console.log('API에서 받아온 상품 데이터:', JSON.stringify(data[0], null, 2));
+    
+    // 가격 정보 처리
+    const processedData = data.map((product: any) => ({
+      ...product,
+      regular_price: product.regular_price || product.price,
+      sale_price: product.sale_price || ''
+    }));
+
+    return processedData;
   } catch (error) {
     console.error('상품 조회 오류:', error);
     return []; // 에러 발생 시 빈 배열 반환
