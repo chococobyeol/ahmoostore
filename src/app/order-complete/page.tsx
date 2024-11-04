@@ -1,31 +1,37 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
+import { Suspense } from 'react';
 
-export default function OrderCompletePage() {
+function OrderCompleteContent() {
   const searchParams = useSearchParams();
-  const orderId = searchParams.get('order_id');
+  const orderId = searchParams.get('orderId');
+  const amount = searchParams.get('amount');
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="max-w-2xl mx-auto bg-white p-8 rounded-lg shadow">
-        <h1 className="text-3xl font-bold text-center mb-8">주문이 완료되었습니다!</h1>
-        <div className="text-center mb-8">
-          <p className="text-lg mb-2">주문번호: {orderId}</p>
-          <p className="text-gray-600">
-            결제가 성공적으로 처리되었습니다. 주문 내역은 이메일로 발송됩니다.
-          </p>
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white p-8 rounded-lg shadow-md max-w-md w-full">
+        <h1 className="text-2xl font-bold text-green-600 mb-4">주문 완료</h1>
+        <div className="text-gray-600 mb-6">
+          <p>주문이 성공적으로 완료되었습니다.</p>
+          {orderId && <p className="mt-2">주문번호: {orderId}</p>}
+          {amount && <p className="mt-2">결제금액: {parseInt(amount).toLocaleString()}원</p>}
         </div>
-        <div className="flex justify-center">
-          <Link
-            href="/products"
-            className="bg-blue-500 text-white px-6 py-3 rounded-lg hover:bg-blue-600"
-          >
-            쇼핑 계속하기
-          </Link>
-        </div>
+        <a
+          href="/"
+          className="block w-full text-center bg-gray-800 text-white py-2 px-4 rounded hover:bg-gray-700 transition-colors"
+        >
+          홈으로 돌아가기
+        </a>
       </div>
     </div>
+  );
+}
+
+export default function OrderCompletePage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <OrderCompleteContent />
+    </Suspense>
   );
 } 
