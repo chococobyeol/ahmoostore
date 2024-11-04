@@ -181,13 +181,64 @@ export const getProducts = async () => {
     order: 'desc'
   };
   
-  // 기존 get 함수 사용으로 되돌리기
-  return get(endpoint, { params });
+  const consumerKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
+  const consumerSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
+
+  if (!consumerKey || !consumerSecret) {
+    throw new Error('WooCommerce Consumer 키가 설정되지 않았습니다.');
+  }
+
+  try {
+    const fullUrl = `${baseURL}${endpoint}`;
+    const queryString = new URLSearchParams(params).toString();
+    const requestUrl = `${fullUrl}?${queryString}`;
+
+    const response = await fetch(requestUrl, {
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64'),
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('상품 데이터를 가져오는데 실패했습니다.');
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('상품 조회 오류:', error);
+    return []; // 에러 발생 시 빈 배열 반환
+  }
 };
 
 export const getProduct = async (id: number) => {
   const endpoint = `/wp-json/wc/v3/products/${id}`;
-  return get(endpoint);
+  const consumerKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
+  const consumerSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
+
+  if (!consumerKey || !consumerSecret) {
+    throw new Error('WooCommerce Consumer 키가 설정되지 않았습니다.');
+  }
+
+  try {
+    const fullUrl = `${baseURL}${endpoint}`;
+    const response = await fetch(fullUrl, {
+      headers: {
+        'Authorization': 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64'),
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('상품 데이터를 가져오는데 실패했습니다.');
+    }
+
+    return response.json();
+  } catch (error) {
+    console.error('상품 조회 오류:', error);
+    return null; // 에러 발생 시 null 반환
+  }
 };
 
 export function getWooCommerceKeys() {
