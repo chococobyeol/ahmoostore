@@ -173,14 +173,28 @@ export const waitForOrderCompletion = async (orderId: number, maxAttempts = 30):
 };
 
 export async function getProducts() {
-  const response = await fetch(`${process.env.WORDPRESS_URL}/wp-json/wc/v3/products`, {
+  const baseURL = process.env.NEXT_PUBLIC_WORDPRESS_API_URL;
+  const consumerKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
+  const consumerSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
+
+  if (!baseURL) {
+    throw new Error('WordPress API URL이 설정되지 않았습니다.');
+  }
+
+  if (!consumerKey || !consumerSecret) {
+    throw new Error('WooCommerce Consumer 키가 설정되지 않았습니다.');
+  }
+
+  const response = await fetch(`${baseURL}/wp-json/wc/v3/products`, {
     headers: {
-      // 기존 인증 헤더들...
+      'Authorization': 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64'),
+      'Content-Type': 'application/json'
     },
-    cache: 'no-store',  // 캐시 비활성화
+    cache: 'no-store'
   });
 
   if (!response.ok) {
+    console.error('상품 조회 응답 오류:', await response.text());
     throw new Error('상품을 불러오는데 실패했습니다');
   }
 
