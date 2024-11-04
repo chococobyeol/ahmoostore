@@ -174,7 +174,13 @@ export const waitForOrderCompletion = async (orderId: number, maxAttempts = 30):
 
 export const getProducts = async () => {
   const endpoint = '/wp-json/wc/v3/products';
-  return get(endpoint);
+  const params = {
+    status: 'publish',
+    per_page: '100',
+    orderby: 'date',
+    order: 'desc'
+  };
+  return get(endpoint, { params });
 };
 
 export const getProduct = async (id: number) => {
