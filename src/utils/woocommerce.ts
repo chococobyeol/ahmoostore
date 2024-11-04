@@ -181,32 +181,8 @@ export const getProducts = async () => {
     order: 'desc'
   };
   
-  // consumer key와 secret을 사용하도록 수정
-  const consumerKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
-  const consumerSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
-
-  if (!consumerKey || !consumerSecret) {
-    throw new Error('WooCommerce Consumer 키가 설정되지 않았습니다.');
-  }
-
-  try {
-    const fullUrl = `${baseURL}${endpoint}`;
-    const response = await fetch(fullUrl, {
-      headers: {
-        'Authorization': 'Basic ' + btoa(`${consumerKey}:${consumerSecret}`),
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('상품 데이터를 가져오는데 실패했습니다.');
-    }
-
-    return response.json();
-  } catch (error) {
-    console.error('상품 조회 오류:', error);
-    throw error;
-  }
+  // 기존 get 함수 사용으로 되돌리기
+  return get(endpoint, { params });
 };
 
 export const getProduct = async (id: number) => {
