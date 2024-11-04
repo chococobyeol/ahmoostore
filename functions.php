@@ -65,7 +65,7 @@ function login_user_api($request) {
     if (is_wp_error($user)) {
         return new WP_Error(
             'login_failed',
-            '아이디 또는 비밀번가 올바���지 않습니다.',
+            '아이디 또는 비밀번가 올바지 않습니다.',
             array('status' => 401)
         );
     }
@@ -114,10 +114,18 @@ function update_order_status_callback($request) {
 }
 
 add_action('init', function() {
-    header("Access-Control-Allow-Origin: http://localhost:3000");
-    header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
-    header("Access-Control-Allow-Headers: Authorization, Content-Type");
-    header("Access-Control-Allow-Credentials: true");
+    $allowed_origins = array(
+        'http://localhost:3000',
+        'https://your-app-name.onrender.com'  // Render.com 도메인으로 교체
+    );
+    
+    $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    if (in_array($origin, $allowed_origins)) {
+        header("Access-Control-Allow-Origin: $origin");
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Authorization, Content-Type");
+        header("Access-Control-Allow-Credentials: true");
+    }
     
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
         status_header(200);
