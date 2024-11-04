@@ -18,9 +18,7 @@ export default function ProductCard({
   sale_price,
   images,
 }: ProductCardProps) {
-  const hasDiscount = sale_price !== '' && sale_price !== '0' && parseFloat(sale_price) < parseFloat(regular_price);
-  
-  const displayPrice = hasDiscount ? sale_price : regular_price || price;
+  const hasDiscount = sale_price !== '' && sale_price !== '0';
   
   return (
     <Link href={`/products/${id}`} className="group">
@@ -35,14 +33,16 @@ export default function ProductCard({
       </div>
       <h3 className="mt-4 text-sm text-gray-700">{name}</h3>
       <div className="mt-1">
-        {hasDiscount ? (
-          <div className="flex gap-2 items-center">
-            <span className="text-lg font-medium text-red-600">₩{displayPrice}</span>
-            <span className="text-sm text-gray-400 line-through">₩{regular_price}</span>
-          </div>
-        ) : (
-          <p className="text-lg font-medium text-gray-900">₩{displayPrice}</p>
-        )}
+        <div className="flex gap-2 items-center">
+          {hasDiscount ? (
+            <>
+              <span className="text-lg font-medium text-red-600">₩{sale_price}</span>
+              <span className="text-sm text-gray-400 line-through">₩{regular_price}</span>
+            </>
+          ) : (
+            <span className="text-lg font-medium text-gray-900">₩{regular_price}</span>
+          )}
+        </div>
       </div>
     </Link>
   );
