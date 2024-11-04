@@ -90,56 +90,46 @@ export const get = async (endpoint: string, config: RequestConfig = {}, useOrder
   }
 };
 
-export const createOrder = async (orderData: any): Promise<WooCommerceOrder> => {
-  const endpoint = '/wp-json/wc/v3/orders';
-  const fullUrl = `${baseURL}${endpoint}`;
-  
-  if (!orderKey || !orderSecret) {
-    console.error('주문 API 키가 설정되지 않았습니다:', { orderKey, orderSecret });
-    throw new Error('주문 API 키가 설정되지 않았습니다.');
-  }
-
-  const oauthHeader = getOAuthHeader(fullUrl, 'POST', orderKey!, orderSecret!);
-  
+export const createOrder = async (orderData: any) => {
   try {
-    console.log('주문 생성 요청 정보:', {
-      url: fullUrl,
-      baseURL,
-      endpoint,
-      orderKey,
-      orderSecret,
-      data: orderData,
-      headers: {
-        ...oauthHeader,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      }
-    });
+    const formattedOrderData = {
+      ...orderData,
+      line_items: orderData.line_items.map((item: any) => ({
+        product_id: item.product_id,
+        quantity: item.quantity || 1,
+        price: item.price,
+        total: (item.price * (item.quantity || 1)).toString()
+      }))
+    };
 
-    const response = await axios({
+    console.log('주문 생성 요청 데이터:', formattedOrderData);
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL}/wp-json/wc/v3/orders`, {
       method: 'POST',
-      url: fullUrl,
-      data: orderData,
       headers: {
-        ...oauthHeader,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Authorization': 'Basic ' + btoa(`${process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_KEY}:${process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_SECRET}`)
       },
-      withCredentials: true
+      body: JSON.stringify(formattedOrderData)
     });
 
-    console.log('주문 생성 응답:', response.data);
-    return response.data;
-  } catch (error: any) {
-    console.error('주문 생성 상세 오류:', {
-      message: error.message,
-      response: error.response?.data,
-      status: error.response?.status,
-      request: error.request,
-      config: error.config,
-      stack: error.stack
-    });
-    throw error;
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('주문 생성 실패 응답:', errorData);
+      throw new Error(`주문 생성 실패: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+    console.log('주문 생성 성공 응답:', data);
+    return data;
+  } catch (error) {
+    console.error('주문 생성 상세 에러:', error);
+    
+    if (error instanceof Error) {
+      throw new Error(`주문 생성 상세 오류: ${error.message}`);
+    } else {
+      throw new Error('주문 생성 중 알 수 없는 오류가 발생했습니다.');
+    }
   }
 };
 

@@ -62,23 +62,21 @@ export default function CheckoutPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!form.address) {
-      alert('배송지 주소를 입력해주세요.');
-      return;
-    }
+    setIsLoading(true);
 
     try {
-      setIsLoading(true);
-      console.log('주문 시작 - 폼 데이터:', form);
-      console.log('주문 시작 - 상품 목록:', items);
+      // 장바구니 아이템을 WooCommerce 주문 형식으로 변환
+      const lineItems = items.map(item => ({
+        product_id: item.id,
+        quantity: item.quantity,  // 장바구니의 수량 사용
+        price: item.price.toString(),  // 상품 단가
+        total: (parseFloat(item.price) * item.quantity).toString()  // 총액 계산
+      }));
 
-      // 주문 생성
       const orderData = {
-        payment_method: "simplepay",
-        payment_method_title: "Simple Pay",
+        payment_method: "tosspayments",
+        payment_method_title: "토스페이먼츠",
         set_paid: false,
-        status: "pending",
         billing: {
           first_name: form.name,
           email: form.email,
@@ -93,9 +91,7 @@ export default function CheckoutPage() {
           address_2: form.addressDetail,
           country: form.isInternational ? form.country : 'KR',
         },
-        line_items: items.map(item => ({
-          product_id: item.id,
-        })),
+        line_items: lineItems,  // 수정된 line_items 사용
         customer_note: form.message,
         meta_data: [
           {

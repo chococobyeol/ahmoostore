@@ -15,17 +15,8 @@ add_action('rest_api_init', function () {
 
     register_rest_route('custom/v1', '/update-order-status', array(
         'methods' => ['POST', 'OPTIONS'],
-        'callback' => 'update_order_status_api',
-        'permission_callback' => '__return_true',
-        'args' => array(
-            'order_id' => array(
-                'required' => true,
-                'type' => 'string',
-                'validate_callback' => function($param) {
-                    return !empty($param);
-                }
-            )
-        )
+        'callback' => 'update_order_status_callback',
+        'permission_callback' => '__return_true'
     ));
 });
 
@@ -74,7 +65,7 @@ function login_user_api($request) {
     if (is_wp_error($user)) {
         return new WP_Error(
             'login_failed',
-            '아이디 또는 비밀번가 올바르지 않습니다.',
+            '아이디 또는 비밀번가 올바���지 않습니다.',
             array('status' => 401)
         );
     }
@@ -91,7 +82,7 @@ function login_user_api($request) {
     );
 }
 
-function update_order_status_api($request) {
+function update_order_status_callback($request) {
     $json = $request->get_json_params();
     $order_id = isset($json['order_id']) ? sanitize_text_field($json['order_id']) : '';
     
@@ -99,19 +90,13 @@ function update_order_status_api($request) {
         return new WP_Error('no_order_id', '주문 ID가 필요합니다.', array('status' => 400));
     }
 
-    if (!class_exists('WooCommerce')) {
-        return new WP_Error('woocommerce_required', 'WooCommerce가 필요합니다.', array('status' => 500));
-    }
-
-    $order = wc_get_order($order_id);
-    
-    if (!$order) {
-        return new WP_Error('invalid_order', '유효하지 않은 주문입니다.', array('status' => 404));
-    }
-
     try {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return new WP_Error('invalid_order', '유효하지 않은 주문입니다.', array('status' => 404));
+        }
+
         $order->update_status('processing', '토스페이먼츠 결제 완료');
-        wc_reduce_stock_levels($order_id);
         
         return array(
             'success' => true,
@@ -130,8 +115,8 @@ function update_order_status_api($request) {
 
 add_action('init', function() {
     header("Access-Control-Allow-Origin: http://localhost:3000");
-    header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
-    header("Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With");
+    header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+    header("Access-Control-Allow-Headers: Authorization, Content-Type");
     header("Access-Control-Allow-Credentials: true");
     
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
@@ -143,16 +128,53 @@ add_action('init', function() {
 add_action('rest_api_init', function() {
     remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
     add_filter('rest_pre_serve_request', function($value) {
-        header("Access-Control-Allow-Origin: http://localhost:3000");
-        header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-        header("Access-Control-Allow-Headers: Content-Type");
-        header("Access-Control-Allow-Credentials: true");
-
-        if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-            status_header(200);
-            exit();
-        }
-
+        header('Access-Control-Allow-Origin: http://localhost:3000');
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
+        
         return $value;
-    }, 15);
-}); 
+    });
+});
+
+// WooCommerce REST API 권한 설정
+add_filter('woocommerce_rest_check_permissions', function($permission, $context, $object_id, $post_type){
+    return true;
+}, 10, 4);
+
+// REST API 응답 헤더에 CORS 추가
+add_action('rest_api_init', function () {
+    add_filter('rest_pre_serve_request', function ($value) {
+        header('Access-Control-Allow-Origin: *');
+        header('Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE');
+        header('Access-Control-Allow-Credentials: true');
+        header('Access-Control-Allow-Headers: Origin, X-Requested-With, Content-Type, Accept, Authorization');
+        return $value;
+    });
+}, 15);
+
+// WooCommerce REST API 로깅 추가
+add_filter('woocommerce_rest_pre_insert_shop_order_object', function($order, $request) {
+    error_log('WooCommerce 주문 생성 요청 데이터: ' . print_r($request->get_params(), true));
+    return $order;
+}, 10, 2);
+
+// WooCommerce REST API 에러 로깅
+add_filter('rest_pre_dispatch', function($result, $server, $request) {
+    if (strpos($request->get_route(), '/wc/v3/orders') !== false) {
+        error_log('WooCommerce API 요청 경로: ' . $request->get_route());
+        error_log('WooCommerce API 요청 메소드: ' . $request->get_method());
+        error_log('WooCommerce API 요청 헤더: ' . print_r($request->get_headers(), true));
+        error_log('WooCommerce API 요청 파라미터: ' . print_r($request->get_params(), true));
+    }
+    return $result;
+}, 10, 3);
+
+// WooCommerce REST API 권한 설정 수정
+add_filter('woocommerce_rest_check_permissions', function($permission, $context, $object_id, $post_type) {
+    if ($post_type === 'shop_order') {
+        error_log('WooCommerce 주문 권한 체크: ' . $context);
+        return true;
+    }
+    return $permission;
+}, 10, 4);
