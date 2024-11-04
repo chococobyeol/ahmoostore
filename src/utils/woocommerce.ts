@@ -172,56 +172,20 @@ export const waitForOrderCompletion = async (orderId: number, maxAttempts = 30):
   return false;
 };
 
-export const getProducts = async () => {
-  const endpoint = '/wp-json/wc/v3/products';
-  const params = {
-    status: 'publish',
-    per_page: '100',
-    orderby: 'date',
-    order: 'desc'
-  };
-  
-  const consumerKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
-  const consumerSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
+export async function getProducts() {
+  const response = await fetch(`${process.env.WORDPRESS_URL}/wp-json/wc/v3/products`, {
+    headers: {
+      // 기존 인증 헤더들...
+    },
+    cache: 'no-store',  // 캐시 비활성화
+  });
 
-  if (!consumerKey || !consumerSecret) {
-    throw new Error('WooCommerce Consumer 키가 설정되지 않았습니다.');
+  if (!response.ok) {
+    throw new Error('상품을 불러오는데 실패했습니다');
   }
 
-  try {
-    const fullUrl = `${baseURL}${endpoint}`;
-    const queryString = new URLSearchParams(params).toString();
-    const requestUrl = `${fullUrl}?${queryString}`;
-
-    const response = await fetch(requestUrl, {
-      headers: {
-        'Authorization': 'Basic ' + Buffer.from(`${consumerKey}:${consumerSecret}`).toString('base64'),
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (!response.ok) {
-      throw new Error('상품 데이터를 가져오는데 실패했습니다.');
-    }
-
-    const data = await response.json();
-    
-    // 받아온 데이터 확인
-    console.log('API에서 받아온 상품 데이터:', JSON.stringify(data[0], null, 2));
-    
-    // 가격 정보 처리
-    const processedData = data.map((product: any) => ({
-      ...product,
-      regular_price: product.regular_price || product.price,
-      sale_price: product.sale_price || ''
-    }));
-
-    return processedData;
-  } catch (error) {
-    console.error('상품 조회 오류:', error);
-    return []; // 에러 발생 시 빈 배열 반환
-  }
-};
+  return response.json();
+}
 
 export const getProduct = async (id: number) => {
   const endpoint = `/wp-json/wc/v3/products/${id}`;

@@ -10,6 +10,8 @@ interface Product {
   description: string;
 }
 
+export const revalidate = 0;
+
 export default async function ProductsPage() {
   try {
     const products = await getProducts();
