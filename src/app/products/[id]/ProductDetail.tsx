@@ -8,8 +8,10 @@ import { useState } from 'react';
 interface Product {
   id: number;
   name: string;
+  regular_price: string;
+  sale_price: string;
   price: string;
-  images: { src: string }[];
+  images: { src: string; alt: string }[];
   description: string;
 }
 
@@ -17,7 +19,7 @@ interface ProductDetailProps {
   product: Product;
 }
 
-export function ProductDetail({ product }: ProductDetailProps) {
+export default function ProductDetail({ product }: ProductDetailProps) {
   const { addToCart } = useCart();
   const [quantity, setQuantity] = useState(1);
 
@@ -36,28 +38,55 @@ export function ProductDetail({ product }: ProductDetailProps) {
       </Link>
       
       <div className="grid md:grid-cols-2 gap-8">
-        <div className="relative h-96">
-          {product.images[0] && (
+        <div className="relative h-96 md:h-[600px]">
+          {product.images && product.images[0] ? (
             <Image
               src={product.images[0].src}
-              alt={product.name}
+              alt={product.images[0].alt || product.name}
               fill
-              className="object-contain"
+              style={{ objectFit: 'cover' }}
+              className="rounded-lg"
             />
+          ) : (
+            <div className="w-full h-full bg-gray-200 flex items-center justify-center rounded-lg">
+              <span>이미지 없음</span>
+            </div>
           )}
         </div>
-
-        <div>
-          <h1 className="text-3xl font-bold mb-4">{product.name}</h1>
-          <div 
-            className="prose prose-lg mb-6"
-            dangerouslySetInnerHTML={{ __html: product.description }}
-          />
-          <div className="mb-6">
-            <span className="text-2xl font-bold">
-              {parseInt(product.price).toLocaleString()}원
-            </span>
+        
+        <div className="space-y-4">
+          <h1 className="text-3xl font-bold">{product.name}</h1>
+          
+          <div className="space-y-2">
+            {product.sale_price ? (
+              <>
+                <p className="text-lg line-through text-gray-500">
+                  {new Intl.NumberFormat('ko-KR', { 
+                    style: 'currency', 
+                    currency: 'KRW' 
+                  }).format(Number(product.regular_price))}
+                </p>
+                <p className="text-2xl font-bold text-red-600">
+                  {new Intl.NumberFormat('ko-KR', { 
+                    style: 'currency', 
+                    currency: 'KRW' 
+                  }).format(Number(product.sale_price))}
+                </p>
+              </>
+            ) : (
+              <p className="text-2xl font-bold text-blue-600">
+                {new Intl.NumberFormat('ko-KR', { 
+                  style: 'currency', 
+                  currency: 'KRW' 
+                }).format(Number(product.regular_price))}
+              </p>
+            )}
           </div>
+          
+          <div className="prose max-w-none" 
+               dangerouslySetInnerHTML={{ __html: product.description }} 
+          />
+          
           <div className="flex items-center gap-4 mb-6">
             <label htmlFor="quantity" className="font-medium">수량:</label>
             <input

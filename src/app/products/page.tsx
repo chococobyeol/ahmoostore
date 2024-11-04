@@ -5,6 +5,8 @@ import Image from 'next/image';
 interface Product {
   id: number;
   name: string;
+  regular_price: string;
+  sale_price: string;
   price: string;
   images: { src: string; alt: string }[];
   description: string;
@@ -43,12 +45,31 @@ export default async function ProductsPage() {
                   )}
                 </div>
                 <h2 className="text-xl font-semibold mb-2">{product.name}</h2>
-                <p className="text-lg font-bold text-blue-600">
-                  {new Intl.NumberFormat('ko-KR', { 
-                    style: 'currency', 
-                    currency: 'KRW' 
-                  }).format(Number(product.price))}
-                </p>
+                <div className="space-y-1">
+                  {product.sale_price ? (
+                    <>
+                      <p className="text-sm line-through text-gray-500">
+                        {new Intl.NumberFormat('ko-KR', { 
+                          style: 'currency', 
+                          currency: 'KRW' 
+                        }).format(Number(product.regular_price))}
+                      </p>
+                      <p className="text-lg font-bold text-red-600">
+                        {new Intl.NumberFormat('ko-KR', { 
+                          style: 'currency', 
+                          currency: 'KRW' 
+                        }).format(Number(product.sale_price))}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-lg font-bold text-blue-600">
+                      {new Intl.NumberFormat('ko-KR', { 
+                        style: 'currency', 
+                        currency: 'KRW' 
+                      }).format(Number(product.regular_price))}
+                    </p>
+                  )}
+                </div>
               </Link>
             </div>
           ))}
