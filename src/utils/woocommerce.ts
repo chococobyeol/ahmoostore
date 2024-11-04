@@ -5,8 +5,8 @@ import OAuth from 'oauth-1.0a';
 const baseURL = process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL;
 
 // 상품 조회용 키 (서버 사이드)
-const productKey = process.env.WOOCOMMERCE_CONSUMER_KEY;
-const productSecret = process.env.WOOCOMMERCE_CONSUMER_SECRET;
+const productKey = process.env.NEXT_PUBLIC_WOOCOMMERCE_PRODUCT_KEY;
+const productSecret = process.env.NEXT_PUBLIC_WOOCOMMERCE_PRODUCT_SECRET;
 
 // 주문 생성용 키 (클라이언트 사이드)
 const orderKey = process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_KEY;
@@ -181,3 +181,27 @@ export const getProduct = async (id: number) => {
   const endpoint = `/wp-json/wc/v3/products/${id}`;
   return get(endpoint);
 };
+
+export function getWooCommerceKeys() {
+  const productKey = process.env.NEXT_PUBLIC_WOOCOMMERCE_PRODUCT_KEY;
+  const productSecret = process.env.NEXT_PUBLIC_WOOCOMMERCE_PRODUCT_SECRET;
+  const orderKey = process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_KEY;
+  const orderSecret = process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_SECRET;
+
+  if (!productKey || !productSecret) {
+    // 제품 API 키가 없을 경우 기본 consumer 키를 사용
+    return {
+      productKey: process.env.WOOCOMMERCE_CONSUMER_KEY,
+      productSecret: process.env.WOOCOMMERCE_CONSUMER_SECRET,
+      orderKey,
+      orderSecret,
+    };
+  }
+
+  return {
+    productKey,
+    productSecret,
+    orderKey,
+    orderSecret,
+  };
+}
