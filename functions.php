@@ -1,5 +1,20 @@
 <?php
 
+add_action('init', function() {
+    if (PHP_SESSION_NONE === session_status()) {
+        session_start();
+    }
+    
+    // CORS 헤더 설정
+    if (isset($_SERVER['HTTP_ORIGIN'])) {
+        header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+        header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+        header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization, X-WP-Nonce");
+        header("Access-Control-Expose-Headers: X-WP-Nonce");
+    }
+}, 1);  // 우선순위를 1로 설정하여 가장 먼저 실행되도록 함
+
 add_action('rest_api_init', function () {
     register_rest_route('custom/v1', '/register', array(
         'methods' => 'POST',
@@ -299,13 +314,6 @@ add_action('woocommerce_order_status_changed', function($order_id, $old_status, 
 
 // 비로그인 사용자 카트 기능 활성화
 add_filter('woocommerce_persistent_cart_enabled', '__return_true');
-
-// 세션 시작
-add_action('init', function() {
-    if (!session_id()) {
-        session_start();
-    }
-});
 
 // 비로그인 사용자 카트 키 설정
 add_filter('woocommerce_cart_session_key', function($key, $customer_id) {

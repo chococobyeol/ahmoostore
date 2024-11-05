@@ -109,7 +109,8 @@ export async function getUserOrders() {
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'X-WP-Nonce': await getNonce()
       }
     });
 
