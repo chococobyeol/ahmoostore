@@ -54,30 +54,40 @@ interface LoginResponse {
 
 export const loginUser = async (credentials: LoginData): Promise<LoginResponse> => {
   try {
-    const response = await axios({
-      method: 'post',
-      url: `${baseURL}/wp-json/custom/v1/login`,
-      data: credentials,
+    // 로그인 요청
+    const response = await fetch(`${baseURL}/wp-json/custom/v1/login`, {
+      method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
-      withCredentials: true
+      body: JSON.stringify(credentials)
     });
-    
-    const sessionCheck = await fetch(
-      `${baseURL}/wp-json/wp/v2/users/me`,
-      {
-        credentials: 'include'
-      }
-    );
-    
-    console.log('로그인 후 세션 상태:', sessionCheck.status);
-    
-    return response.data;
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || '로그인에 실패했습니다.');
+    }
+
+    const data = await response.json();
+    console.log('로그인 응답:', data);
+
+    // 세션 상태 확인
+    const sessionCheck = await fetch(`${baseURL}/wp-json/wp/v2/users/me`, {
+      credentials: 'include'
+    });
+
+    console.log('세션 상태:', sessionCheck.status);
+
+    if (sessionCheck.ok) {
+      return data;
+    } else {
+      throw new Error('세션 인증에 실패했습니다.');
+    }
   } catch (error: any) {
-    console.error('로그인 오류:', error.response || error);
-    throw new Error(error.response?.data?.message || '로그인에 실패했습니다.');
+    console.error('로그인 오류:', error);
+    throw new Error(error.message || '로그인에 실패했습니다.');
   }
 };
 
