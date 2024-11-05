@@ -59,14 +59,14 @@ export const loginUser = async (credentials: LoginData): Promise<LoginResponse> 
       url: `${baseURL}/wp-json/custom/v1/login`,
       data: credentials,
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Content-Type': 'application/json'
       },
       withCredentials: true
     });
     
     return response.data;
   } catch (error: any) {
+    console.error('로그인 오류:', error.response || error);
     if (error.response) {
       throw new Error(error.response.data?.message || `로그인 실패: ${error.response.status}`);
     } else if (error.request) {
