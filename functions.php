@@ -135,9 +135,10 @@ function update_order_status_callback($request) {
 add_action('init', function() {
     if (isset($_SERVER['HTTP_ORIGIN'])) {
         header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
-        header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-        header("Access-Control-Allow-Headers: Content-Type");
+        header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
+        header("Access-Control-Allow-Headers: Content-Type, Accept, Authorization, X-Requested-With");
         header("Access-Control-Allow-Credentials: true");
+        header("Access-Control-Max-Age: 3600");
     }
     
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
@@ -151,9 +152,10 @@ add_action('rest_api_init', function() {
     add_filter('rest_pre_serve_request', function($value) {
         if (isset($_SERVER['HTTP_ORIGIN'])) {
             header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
-            header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
-            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-            header('Access-Control-Allow-Credentials: true');
+            header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
+            header("Access-Control-Allow-Headers: Content-Type, Accept, Authorization, X-Requested-With");
+            header("Access-Control-Allow-Credentials: true");
+            header("Access-Control-Max-Age: 3600");
         }
         return $value;
     });

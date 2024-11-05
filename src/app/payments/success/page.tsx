@@ -11,19 +11,21 @@ async function updateOrderStatus(orderId: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
         order_id: orderId
-      })
+      }),
+      credentials: 'include'
     });
 
-    const data = await response.json();
-    
     if (!response.ok) {
-      console.error('주문 상태 업데이트 실패 응답:', data);
-      throw new Error(data.message || '주문 상태 업데이트에 실패했습니다');
+      const errorData = await response.json().catch(() => ({}));
+      console.error('주문 상태 업데이트 실패:', errorData);
+      throw new Error(errorData.message || '주문 상태 업데이트에 실패했습니다');
     }
 
+    const data = await response.json();
     console.log('주문 상태 업데이트 성공:', data);
     return data;
   } catch (error) {
