@@ -136,15 +136,9 @@ if (!WORDPRESS_URL || !WOOCOMMERCE_URL) {
 
 export async function fetchUserOrders(): Promise<OrdersResponse> {
   try {
-    // 현재 세션 상태 확인
-    const sessionResponse = await fetch(`${WORDPRESS_URL}/wp-json/wp/v2/users/me`, {
-      credentials: 'include',
-    });
-    console.log('WordPress 세션 상태:', sessionResponse.status);
-
-    const nonce = await getNonce();
-    console.log('Nonce 값:', nonce);
-    console.log('요청 URL:', `${WORDPRESS_URL}/wp-json/custom/v1/my-orders`);
+    // 세션 상태 확인 로그 추가
+    console.log('WordPress URL:', WORDPRESS_URL);
+    console.log('요청 시작');
 
     const response = await fetch(
       `${WORDPRESS_URL}/wp-json/custom/v1/my-orders`,
@@ -152,7 +146,7 @@ export async function fetchUserOrders(): Promise<OrdersResponse> {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'X-WP-Nonce': nonce,
+          'Accept': 'application/json',
           'Origin': process.env.NEXTAUTH_URL || 'https://ahmoostore.onrender.com',
         },
       }
@@ -163,14 +157,23 @@ export async function fetchUserOrders(): Promise<OrdersResponse> {
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('에러 응답:', errorText);
-      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      console.error('API 오류 응답:', errorText);
+      
+      if (response.status === 401) {
+        throw new Error('로그인이 필요합니다. 다시 로그인해주세요.');
+      }
+      
+      throw new Error(`주문 조회 실패: ${errorText}`);
     }
 
     const data = await response.json();
-    console.log('주문 데이터:', data);
+    console.log('받은 데이터:', data);
     
-    return data as OrdersResponse;
+    if (!data.success || !Array.isArray(data.orders)) {
+      throw new Error('잘못된 응답 형식입니다.');
+    }
+
+    return data;
   } catch (error) {
     console.error('주문 조회 중 오류 발생:', error);
     throw error;
