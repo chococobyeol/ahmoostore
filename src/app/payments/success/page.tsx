@@ -3,30 +3,56 @@
 import { useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 
-async function updateOrderStatus(orderId: string) {
+async function updateOrderStatus(orderId: string, searchParams: URLSearchParams) {
   try {
     console.log('주문 상태 업데이트 시도:', orderId);
     
-    const response = await fetch(`${process.env.NEXT_PUBLIC_WORDPRESS_URL}/wp-json/custom/v1/update-order-status`, {
-      method: 'POST',
+    // Basic Auth 헤더 생성 (ORDER API 키 사용)
+    const auth = btoa(`${process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_KEY}:${process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_SECRET}`);
+    
+    // WooCommerce REST API 직접 호출
+    const response = await fetch(`${process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL}/wp-json/wc/v3/orders/${orderId}`, {
+      method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Authorization': `Basic ${auth}`,
       },
       body: JSON.stringify({
-        order_id: orderId
-      }),
-      credentials: 'include'
+        status: 'processing',
+        payment_method: 'tosspayments',
+        payment_method_title: '토스페이먼츠',
+        set_paid: true
+      })
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      console.error('주문 상태 업데이트 실패:', errorData);
-      throw new Error(errorData.message || '주문 상태 업데이트에 실패했습니다');
+      console.log('WooCommerce API 실패, 커스텀 엔드포인트 시도');
+      // WooCommerce API 실패시 커스텀 엔드포인트로 시도
+      const fallbackResponse = await fetch(`${process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL}/wp-json/custom/v1/update-order-status`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          order_id: orderId,
+          payment_key: searchParams.get('paymentKey')
+        }),
+        credentials: 'include'
+      });
+
+      const fallbackData = await fallbackResponse.json();
+      
+      if (!fallbackResponse.ok) {
+        console.error('커스텀 엔드포인트 실패:', fallbackData);
+        throw new Error(fallbackData.message || '주문 상태 업데이트에 실패했습니다');
+      }
+
+      console.log('커스텀 엔드포인트 성공:', fallbackData);
+      return fallbackData;
     }
 
     const data = await response.json();
-    console.log('주문 상태 업데이트 성공:', data);
+    console.log('WooCommerce API 성공:', data);
     return data;
   } catch (error) {
     console.error('주문 상태 업데이트 중 오류 발생:', error);
@@ -43,7 +69,7 @@ function SuccessContent() {
   useEffect(() => {
     if (orderId) {
       console.log('주문 ID 확인됨:', orderId);
-      updateOrderStatus(orderId)
+      updateOrderStatus(orderId, searchParams)
         .then(() => {
           console.log('주문 상태 업데이트 성공');
           setUpdateStatus('success');
@@ -53,7 +79,7 @@ function SuccessContent() {
           setUpdateStatus('error');
         });
     }
-  }, [orderId]);
+  }, [orderId, searchParams]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
