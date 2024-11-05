@@ -108,13 +108,24 @@ export async function getUserOrders() {
     const response = await fetch(apiUrl, {
       credentials: 'include',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
       }
     });
 
     console.log('응답 상태:', response.status);
-    const responseData = await response.json();
-    console.log('응답 데이터:', responseData);
+    const responseText = await response.text();
+    console.log('원본 응답:', responseText);
+
+    let responseData;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('JSON 파싱 오류:', e);
+      throw new Error('서버 응답을 파싱할 수 없습니다.');
+    }
+
+    console.log('파싱된 응답 데이터:', responseData);
 
     if (!response.ok) {
       throw new Error(responseData.message || '주문 정보를 가져오는데 실패했습니다.');

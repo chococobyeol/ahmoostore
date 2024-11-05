@@ -155,27 +155,45 @@ function get_user_orders_api($request) {
     }
 
     try {
-        $args = array(
-            'customer_id' => $user_id,
-            'limit' => -1,
-            'orderby' => 'date',
-            'order' => 'DESC',
-        );
+        error_log('WooCommerce 주문 조회 시작');
+        
+        // WooCommerce가 활성화되어 있는지 확인
+        if (!class_exists('WooCommerce')) {
+            throw new Exception('WooCommerce가 활성화되어 있지 않습니다.');
+        }
 
-        error_log('주문 조회 매개변수: ' . print_r($args, true));
-        $orders = wc_get_orders($args);
-        error_log('조회된 주문 수: ' . count($orders));
+        global $wpdb;
+        
+        // 직접 SQL 쿼리로 주문 조회
+        $orders_query = $wpdb->prepare(
+            "SELECT ID FROM {$wpdb->posts} p
+            JOIN {$wpdb->postmeta} pm ON p.ID = pm.post_id
+            WHERE p.post_type = 'shop_order'
+            AND pm.meta_key = '_customer_user'
+            AND pm.meta_value = %d
+            ORDER BY p.post_date DESC",
+            $user_id
+        );
+        
+        error_log('SQL 쿼리: ' . $orders_query);
+        
+        $order_ids = $wpdb->get_col($orders_query);
+        error_log('조회된 주문 ID들: ' . print_r($order_ids, true));
 
         $formatted_orders = array();
-        foreach ($orders as $order) {
+        foreach ($order_ids as $order_id) {
+            $order = wc_get_order($order_id);
+            if (!$order) continue;
+
+            // 주문 소유자 재확인
             if ($order->get_customer_id() != $user_id) {
-                error_log('주문 소유자 불일치 - Order ID: ' . $order->get_id());
+                error_log('주문 소유자 불일치 - Order ID: ' . $order_id);
                 continue;
             }
-            
+
             $order_data = array(
                 'id' => $order->get_id(),
-                'status' => $order->get_status(),
+                'status' => wc_get_order_status_name($order->get_status()),
                 'total' => $order->get_total(),
                 'date_created' => $order->get_date_created()->format('Y-m-d H:i:s'),
                 'payment_method' => $order->get_payment_method_title(),
@@ -193,7 +211,7 @@ function get_user_orders_api($request) {
             $formatted_orders[] = $order_data;
         }
 
-        error_log('응답 데이터: ' . print_r($formatted_orders, true));
+        error_log('최종 응답 데이터: ' . print_r($formatted_orders, true));
 
         return array(
             'success' => true,
