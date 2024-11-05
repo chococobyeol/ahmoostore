@@ -95,18 +95,21 @@ function update_order_status_callback($request) {
 
     try {
         if (!class_exists('WooCommerce')) {
-            error_log('WooCommerce가 활성화되어 있지 않습니다.');
             throw new Exception('WooCommerce가 활성화되어 있지 않습니다.');
         }
 
-        error_log('주문 객체 조회 시도 - Order ID: ' . $order_id);
-        
-        $order_id = str_replace('#', '', $order_id);
-        
-        $order = wc_get_order($order_id);
+        $order_id = trim(str_replace('#', '', $order_id));
+        error_log('정리된 주문 ID: ' . $order_id);
+
+        $order = wc_get_order((int)$order_id);
         
         if (!$order) {
             error_log('주문을 찾을 수 없음 - Order ID: ' . $order_id);
+            
+            global $wpdb;
+            $post = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->posts} WHERE ID = %d", $order_id));
+            error_log('데이터베이스 조회 결과: ' . print_r($post, true));
+            
             return new WP_Error('invalid_order', '유효하지 않은 주문입니다.', array('status' => 404));
         }
 
@@ -118,7 +121,7 @@ function update_order_status_callback($request) {
         $order->update_meta_data('_payment_method_title', '토스페이먼츠');
         $order->update_meta_data('_paid_date', current_time('mysql'));
         
-        $order->add_order_note('토스페이먼츠 결제가 완료되었습니다.');
+        $order->add_order_note('토스페이먼츠 결제가 완료되었습니다.', 0, true);
         
         wc_reduce_stock_levels($order_id);
         
@@ -126,7 +129,18 @@ function update_order_status_callback($request) {
         
         $order->save();
         
+        global $wpdb;
+        $wpdb->update(
+            $wpdb->posts,
+            array('post_status' => 'wc-processing'),
+            array('ID' => $order_id),
+            array('%s'),
+            array('%d')
+        );
+        
         error_log('주문 처리 완료 - 최종 상태: ' . $order->get_status());
+        
+        clean_post_cache($order_id);
         
         return array(
             'success' => true,
@@ -137,6 +151,7 @@ function update_order_status_callback($request) {
         
     } catch (Exception $e) {
         error_log('주문 상태 업데이트 중 오류 발생: ' . $e->getMessage());
+        error_log('오류 발생 위치: ' . $e->getTraceAsString());
         return new WP_Error(
             'update_failed',
             '주문 상태 업데이트 실패: ' . $e->getMessage(),
@@ -146,22 +161,13 @@ function update_order_status_callback($request) {
 }
 
 add_action('init', function() {
+    header("Access-Control-Allow-Origin: *");
+    header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
+    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+    
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-        if (isset($_SERVER['HTTP_ORIGIN'])) {
-            header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
-            header('Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE');
-            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-            header('Access-Control-Allow-Credentials: true');
-            header('Access-Control-Max-Age: 86400');    // 캐시 24시간
-        }
-        exit(0);
-    }
-
-    if (isset($_SERVER['HTTP_ORIGIN'])) {
-        header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
-        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
-        header('Access-Control-Allow-Credentials: true');
+        status_header(200);
+        exit();
     }
 });
 
