@@ -60,8 +60,9 @@ export const loginUser = async (credentials: LoginData): Promise<LoginResponse> 
       data: credentials,
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      }
+        'Accept': 'application/json'
+      },
+      withCredentials: true
     });
     
     return response.data;

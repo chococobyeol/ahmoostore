@@ -116,33 +116,29 @@ function update_order_status_callback($request) {
 add_action('init', function() {
     $allowed_origins = array(
         'http://localhost:3000',
-        'https://your-app-name.onrender.com'  // Render.com 도메인으로 교체
+        'https://ahmoosstore.onrender.com'  // 실제 도메인으로 변경
     );
     
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+    
+    // OPTIONS 요청 처리
+    if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+        if (in_array($origin, $allowed_origins)) {
+            header("Access-Control-Allow-Origin: $origin");
+            header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+            header("Access-Control-Allow-Headers: Authorization, Content-Type");
+            header("Access-Control-Allow-Credentials: true");
+        }
+        exit(0);
+    }
+    
+    // 실제 요청에 대한 CORS 헤더
     if (in_array($origin, $allowed_origins)) {
         header("Access-Control-Allow-Origin: $origin");
-        header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+        header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
         header("Access-Control-Allow-Headers: Authorization, Content-Type");
         header("Access-Control-Allow-Credentials: true");
     }
-    
-    if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-        status_header(200);
-        exit();
-    }
-});
-
-add_action('rest_api_init', function() {
-    remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
-    add_filter('rest_pre_serve_request', function($value) {
-        header('Access-Control-Allow-Origin: http://localhost:3000');
-        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
-        header('Access-Control-Allow-Credentials: true');
-        header('Access-Control-Allow-Headers: Authorization, Content-Type, X-Requested-With');
-        
-        return $value;
-    });
 });
 
 // WooCommerce REST API 권한 설정

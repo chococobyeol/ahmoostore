@@ -11,10 +11,15 @@ RewriteRule . /index.php [L]
 
 # BEGIN CORS Headers
 <IfModule mod_headers.c>
-    SetEnvIf Origin "^(http://localhost:3000|https://your-app-name.onrender.com)$" ALLOWED_ORIGIN=$1
+    SetEnvIf Origin "^(http://localhost:https://ahmoosstore.onrender.com)$" ALLOWED_ORIGIN=$1
     Header set Access-Control-Allow-Origin "%{ALLOWED_ORIGIN}e" env=ALLOWED_ORIGIN
-    Header set Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
+    Header set Access-Control-Allow-Methods "POST, GET, OPTIONS"
     Header set Access-Control-Allow-Headers "Authorization, Content-Type"
     Header set Access-Control-Allow-Credentials "true"
+    
+    # OPTIONS 요청에 대한 처리
+    RewriteEngine On
+    RewriteCond %{REQUEST_METHOD} OPTIONS
+    RewriteRule ^(.*)$ $1 [R=200,L]
 </IfModule>
 # END CORS Headers 
