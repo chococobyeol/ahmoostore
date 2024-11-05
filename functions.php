@@ -96,51 +96,25 @@ function update_order_status_callback($request) {
         // 주문 ID 정리
         $order_id = str_replace('#', '', $order_id);
         
-        // 데이터베이스 직접 업데이트
-        global $wpdb;
-        
-        // 1. post_status 업데이트
-        $result1 = $wpdb->update(
-            $wpdb->posts,
-            array('post_status' => 'wc-processing'),
-            array('ID' => $order_id),
-            array('%s'),
-            array('%d')
-        );
-        
-        error_log('[토스페이먼츠] posts 테이블 업데이트 결과: ' . ($result1 !== false ? 'success' : 'fail'));
-
-        // 2. 메타데이터 업데이트
-        $meta_updates = array(
-            '_payment_method' => 'tosspayments',
-            '_payment_method_title' => '토스페이먼츠',
-            '_paid_date' => current_time('mysql'),
-            '_completed_date' => current_time('mysql'),
-            '_order_status' => 'processing'
-        );
-
-        foreach ($meta_updates as $meta_key => $meta_value) {
-            update_post_meta($order_id, $meta_key, $meta_value);
+        // WooCommerce 주문 객체 가져오기
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            throw new Exception('주문을 찾을 수 없습니다.');
         }
-        
-        // 3. 주문 노트 추가
-        $wpdb->insert(
-            $wpdb->prefix . 'comments',
-            array(
-                'comment_post_ID' => $order_id,
-                'comment_author' => 'WooCommerce',
-                'comment_content' => '토스페이먼츠 결제가 완료되었습니다.',
-                'comment_type' => 'order_note',
-                'comment_date' => current_time('mysql'),
-                'comment_date_gmt' => current_time('mysql', 1)
-            )
-        );
 
-        error_log('[토스페이먼츠] 주문 처리 완료 - Order ID: ' . $order_id);
+        // 결제 완료 처리
+        $order->payment_complete();
         
-        // 캐시 삭제
-        clean_post_cache($order_id);
-        wp_cache_delete($order_id, 'posts');
+        // 주문 상태 변경
+        $order->update_status('processing');
+        
+        // 주문 메모 추가
+        $order->add_order_note('토스페이먼츠 결제가 완료되었습니다.');
+        
+        // 변경사항 저장
+        $order->save();
+        
+        error_log('[토스페이먼츠] 주문 처리 완료 - Order ID: ' . $order_id);
         
         return array(
             'success' => true,
@@ -230,3 +204,49 @@ add_action('woocommerce_order_status_changed', function($order_id, $old_status, 
         $new_status
     ));
 }, 10, 3);
+
+// 비로그인 사용자 카트 기능 활성화
+add_filter('woocommerce_persistent_cart_enabled', '__return_true');
+
+// 세션 시작
+add_action('init', function() {
+    if (!session_id()) {
+        session_start();
+    }
+});
+
+// 비로그인 사용자 카트 키 설정
+add_filter('woocommerce_cart_session_key', function($key, $customer_id) {
+    if ($customer_id === 0) {
+        if (!isset($_SESSION['guest_cart_key'])) {
+            $_SESSION['guest_cart_key'] = wp_generate_uuid4();
+        }
+        return 'guest_cart_' . $_SESSION['guest_cart_key'];
+    }
+    return $key;
+}, 10, 2);
+
+// 카트 저장 간격 설정
+add_filter('woocommerce_cart_session_save_interval', function() {
+    return 60 * 60; // 1시간
+});
+
+// 게스트 카트 데이터 저장
+add_action('woocommerce_cart_updated', function() {
+    if (!is_user_logged_in() && isset($_SESSION['guest_cart_key'])) {
+        $cart_key = 'guest_cart_' . $_SESSION['guest_cart_key'];
+        $cart_content = WC()->cart->get_cart_for_session();
+        set_transient($cart_key, $cart_content, 60 * 60 * 24); // 24시간 유지
+    }
+});
+
+// 게스트 카트 데이터 복원
+add_action('woocommerce_cart_loaded_from_session', function() {
+    if (!is_user_logged_in() && isset($_SESSION['guest_cart_key'])) {
+        $cart_key = 'guest_cart_' . $_SESSION['guest_cart_key'];
+        $cart_content = get_transient($cart_key);
+        if ($cart_content) {
+            WC()->cart->set_cart_contents($cart_content);
+        }
+    }
+});
