@@ -86,17 +86,47 @@ function update_order_status_callback($request) {
     $json = $request->get_json_params();
     $order_id = isset($json['order_id']) ? sanitize_text_field($json['order_id']) : '';
     
+    error_log('주문 상태 업데이트 시작 - 받은 데이터: ' . print_r($json, true));
+    
     if (empty($order_id)) {
+        error_log('주문 상태 업데이트 실패: 주문 ID 없음');
         return new WP_Error('no_order_id', '주문 ID가 필요합니다.', array('status' => 400));
     }
 
     try {
+        if (!class_exists('WooCommerce')) {
+            error_log('WooCommerce가 활성화되어 있지 않습니다.');
+            throw new Exception('WooCommerce가 활성화되어 있지 않습니다.');
+        }
+
+        error_log('주문 객체 조회 시도 - Order ID: ' . $order_id);
+        
+        $order_id = str_replace('#', '', $order_id);
+        
         $order = wc_get_order($order_id);
+        
         if (!$order) {
+            error_log('주문을 찾을 수 없음 - Order ID: ' . $order_id);
             return new WP_Error('invalid_order', '유효하지 않은 주문입니다.', array('status' => 404));
         }
 
-        $order->update_status('processing', '토스페이먼츠 결제 완료');
+        error_log('현재 주문 상태: ' . $order->get_status());
+
+        $order->payment_complete();
+        
+        $order->update_meta_data('_payment_method', 'tosspayments');
+        $order->update_meta_data('_payment_method_title', '토스페이먼츠');
+        $order->update_meta_data('_paid_date', current_time('mysql'));
+        
+        $order->add_order_note('토스페이먼츠 결제가 완료되었습니다.');
+        
+        wc_reduce_stock_levels($order_id);
+        
+        $order->update_status('processing', '결제 완료 처리됨');
+        
+        $order->save();
+        
+        error_log('주문 처리 완료 - 최종 상태: ' . $order->get_status());
         
         return array(
             'success' => true,
@@ -104,7 +134,9 @@ function update_order_status_callback($request) {
             'order_id' => $order_id,
             'new_status' => $order->get_status()
         );
+        
     } catch (Exception $e) {
+        error_log('주문 상태 업데이트 중 오류 발생: ' . $e->getMessage());
         return new WP_Error(
             'update_failed',
             '주문 상태 업데이트 실패: ' . $e->getMessage(),
@@ -114,41 +146,47 @@ function update_order_status_callback($request) {
 }
 
 add_action('init', function() {
-    header("Access-Control-Allow-Origin: https://ahmoosstore.onrender.com");
-    header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-    header("Access-Control-Allow-Headers: Content-Type");
-    header("Access-Control-Allow-Credentials: true");
-    
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
-        status_header(200);
-        exit();
+        if (isset($_SERVER['HTTP_ORIGIN'])) {
+            header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+            header('Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+            header('Access-Control-Allow-Credentials: true');
+            header('Access-Control-Max-Age: 86400');    // 캐시 24시간
+        }
+        exit(0);
+    }
+
+    if (isset($_SERVER['HTTP_ORIGIN'])) {
+        header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+        header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+        header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+        header('Access-Control-Allow-Credentials: true');
     }
 });
 
 add_action('rest_api_init', function() {
     remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
-    
     add_filter('rest_pre_serve_request', function($value) {
-        header("Access-Control-Allow-Origin: https://ahmoosstore.onrender.com");
-        header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
-        header("Access-Control-Allow-Headers: Content-Type");
-        header("Access-Control-Allow-Credentials: true");
+        if (isset($_SERVER['HTTP_ORIGIN'])) {
+            header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+            header('Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE');
+            header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With');
+            header('Access-Control-Allow-Credentials: true');
+        }
         return $value;
     });
 });
 
-// WooCommerce REST API 권한 설정
 add_filter('woocommerce_rest_check_permissions', function($permission, $context, $object_id, $post_type){
     return true;
 }, 10, 4);
 
-// WooCommerce REST API 로깅 추가
 add_filter('woocommerce_rest_pre_insert_shop_order_object', function($order, $request) {
     error_log('WooCommerce 주문 생성 요청 데이터: ' . print_r($request->get_params(), true));
     return $order;
 }, 10, 2);
 
-// WooCommerce REST API 에러 로깅
 add_filter('rest_pre_dispatch', function($result, $server, $request) {
     if (strpos($request->get_route(), '/wc/v3/orders') !== false) {
         error_log('WooCommerce API 요청 경로: ' . $request->get_route());
@@ -159,7 +197,6 @@ add_filter('rest_pre_dispatch', function($result, $server, $request) {
     return $result;
 }, 10, 3);
 
-// WooCommerce REST API 권한 설정 수정
 add_filter('woocommerce_rest_check_permissions', function($permission, $context, $object_id, $post_type) {
     if ($post_type === 'shop_order') {
         error_log('WooCommerce 주문 권한 체크: ' . $context);
@@ -167,3 +204,22 @@ add_filter('woocommerce_rest_check_permissions', function($permission, $context,
     }
     return $permission;
 }, 10, 4);
+
+add_filter('woocommerce_rest_pre_dispatch', function($result, $server, $request) {
+    if (isset($_SERVER['HTTP_ORIGIN'])) {
+        header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+        header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type, Authorization");
+        header("Access-Control-Allow-Credentials: true");
+    }
+    return $result;
+}, 10, 3);
+
+add_action('woocommerce_order_status_changed', function($order_id, $old_status, $new_status) {
+    error_log(sprintf(
+        '주문 상태 변경 - Order ID: %s, Old Status: %s, New Status: %s',
+        $order_id,
+        $old_status,
+        $new_status
+    ));
+}, 10, 3);

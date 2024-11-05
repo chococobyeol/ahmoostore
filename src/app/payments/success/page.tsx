@@ -1,28 +1,32 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 
 async function updateOrderStatus(orderId: string) {
   try {
+    console.log('주문 상태 업데이트 시도:', orderId);
+    
     const response = await fetch(`${process.env.NEXT_PUBLIC_WORDPRESS_URL}/wp-json/custom/v1/update-order-status`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
       body: JSON.stringify({
-        order_id: orderId
+        order_id: orderId,
+        status: 'processing'  // 명시적으로 상태 지정
       }),
       credentials: 'include'
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('주문 상태 업데이트 실패:', errorData);
-      throw new Error('주문 상태 업데이트에 실패했습니다');
+      console.error('주문 상태 업데이트 실패 응답:', data);
+      throw new Error(data.message || '주문 상태 업데이트에 실패했습니다');
     }
 
-    const data = await response.json();
     console.log('주문 상태 업데이트 성공:', data);
     return data;
   } catch (error) {
@@ -34,17 +38,20 @@ async function updateOrderStatus(orderId: string) {
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
-  const paymentKey = searchParams.get('paymentKey');
   const amount = searchParams.get('amount');
+  const [updateStatus, setUpdateStatus] = useState<'pending' | 'success' | 'error'>('pending');
 
   useEffect(() => {
     if (orderId) {
+      console.log('주문 ID 확인됨:', orderId);
       updateOrderStatus(orderId)
         .then(() => {
-          console.log('주문 상태가 성공적으로 업데이트되었습니다.');
+          console.log('주문 상태 업데이트 성공');
+          setUpdateStatus('success');
         })
         .catch((error) => {
           console.error('주문 상태 업데이트 실패:', error);
+          setUpdateStatus('error');
         });
     }
   }, [orderId]);
@@ -57,6 +64,13 @@ function SuccessContent() {
           <p>결제가 성공적으로 완료되었습니다.</p>
           {orderId && <p className="mt-2">주문번호: {orderId}</p>}
           {amount && <p className="mt-2">결제금액: {parseInt(amount).toLocaleString()}원</p>}
+          <p className="mt-2">
+            주문 상태: {
+              updateStatus === 'pending' ? '처리 중...' :
+              updateStatus === 'success' ? '주문 처리 완료' :
+              '주문 처리 중 오류가 발생했습니다'
+            }
+          </p>
         </div>
         <a
           href="/"
