@@ -1,18 +1,24 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { getUserOrders } from '@/utils/wordpress';
+import { useEffect, useState } from 'react';
+import { fetchUserOrders } from '@/utils/wordpress';
 
+// 주문 아이템 타입 정의
 interface OrderItem {
   name: string;
   quantity: number;
-  total: string;
+  total: number;
+  product_id: number;
+  image: string | null;
 }
 
+// 주문 타입 정의
 interface Order {
   id: number;
   status: string;
-  total: string;
+  status_name: string;
+  total: number;
+  currency: string;
   date_created: string;
   payment_method: string;
   items: OrderItem[];
@@ -24,70 +30,64 @@ export default function MyAccount() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function fetchOrders() {
+    async function loadOrders() {
       try {
-        console.log('주문 데이터 가져오기 시작...');
-        const data = await getUserOrders();
-        console.log('받은 주문 데이터:', data);
-        setOrders(data);
-      } catch (err) {
-        console.error('주문 데이터 가져오기 실패:', err);
-        setError(err instanceof Error ? err.message : '주문을 불러오는데 실패했습니다.');
+        setLoading(true);
+        const response = await fetchUserOrders();
+        console.log('받은 주문 데이터:', response);
+        setOrders(response.orders || []);
+      } catch (err: unknown) {
+        console.error('주문 로딩 오류:', err);
+        setError(err instanceof Error ? err.message : '알 수 없는 오류가 발생했습니다.');
       } finally {
         setLoading(false);
       }
     }
 
-    fetchOrders();
+    loadOrders();
   }, []);
+
+  if (loading) return <div>주문 내역을 불러오는 중...</div>;
+  if (error) return <div>오류가 발생했습니다: {error}</div>;
 
   return (
     <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">내 계정</h1>
-      
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">계정 정보</h2>
-        {/* 계정 정보 표시 */}
-      </div>
-
-      <div className="mb-8">
-        <h2 className="text-xl font-semibold mb-4">주문 내역</h2>
-        {loading && <div>주문 내역을 불러오는 중...</div>}
-        {error && <div className="text-red-500">에러: {error}</div>}
-        {!loading && !error && orders.length === 0 && (
-          <div>주문 내역이 없습니다.</div>
-        )}
+      <h1 className="text-2xl font-bold mb-4">내 주문 내역</h1>
+      {orders.length === 0 ? (
+        <p>주문 내역이 없습니다.</p>
+      ) : (
         <div className="space-y-4">
           {orders.map((order) => (
-            <div key={order.id} className="border p-4 rounded-lg shadow">
+            <div key={order.id} className="border p-4 rounded-lg">
               <div className="flex justify-between mb-2">
-                <span className="font-medium">주문번호: {order.id}</span>
-                <span className="text-blue-600">{order.status}</span>
+                <span>주문번호: {order.id}</span>
+                <span>상태: {order.status_name}</span>
               </div>
-              <div className="mb-2 text-gray-600">
-                <span>주문일: {new Date(order.date_created).toLocaleDateString()}</span>
+              <div className="text-sm text-gray-600">
+                <p>주문일시: {new Date(order.date_created).toLocaleString()}</p>
+                <p>결제방법: {order.payment_method}</p>
+                <p>총 금액: {order.total.toLocaleString()}원</p>
               </div>
-              <div className="mb-2 text-gray-600">
-                <span>결제방법: {order.payment_method}</span>
-              </div>
-              <div className="border-t pt-2">
-                <h3 className="font-medium mb-2">주문 상품</h3>
+              <div className="mt-2">
+                <h3 className="font-semibold">주문 상품</h3>
                 {order.items.map((item, index) => (
-                  <div key={index} className="flex justify-between text-gray-700">
-                    <span>{item.name} x {item.quantity}</span>
-                    <span>{parseInt(item.total).toLocaleString()}원</span>
+                  <div key={index} className="flex items-center mt-2">
+                    {item.image && (
+                      <img src={item.image} alt={item.name} className="w-16 h-16 object-cover mr-2" />
+                    )}
+                    <div>
+                      <p>{item.name}</p>
+                      <p className="text-sm text-gray-600">
+                        {item.quantity}개 × {(item.total / item.quantity).toLocaleString()}원
+                      </p>
+                    </div>
                   </div>
                 ))}
-              </div>
-              <div className="border-t mt-2 pt-2 text-right">
-                <span className="font-bold">
-                  총 결제금액: {parseInt(order.total).toLocaleString()}원
-                </span>
               </div>
             </div>
           ))}
         </div>
-      </div>
+      )}
     </div>
   );
 }

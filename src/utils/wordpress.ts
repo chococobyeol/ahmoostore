@@ -99,48 +99,81 @@ async function getNonce(): Promise<string> {
   }
 }
 
-export async function getUserOrders() {
+interface OrderItem {
+  name: string;
+  quantity: number;
+  total: number;
+  product_id: number;
+  image: string | null;
+}
+
+interface Order {
+  id: number;
+  status: string;
+  status_name: string;
+  total: number;
+  currency: string;
+  date_created: string;
+  payment_method: string;
+  items: OrderItem[];
+}
+
+interface OrdersResponse {
+  success: boolean;
+  orders: Order[];
+}
+
+// URL 확인 로직 추가
+const WORDPRESS_URL = process.env.NEXT_PUBLIC_WORDPRESS_API_URL;
+const WOOCOMMERCE_URL = process.env.NEXT_PUBLIC_WOOCOMMERCE_API_URL;
+
+if (!WORDPRESS_URL || !WOOCOMMERCE_URL) {
+  console.error('필수 환경 변수가 설정되지 않았습니다:', {
+    WORDPRESS_URL,
+    WOOCOMMERCE_URL
+  });
+}
+
+export async function fetchUserOrders(): Promise<OrdersResponse> {
   try {
-    console.log('주문 조회 시작...');
-    const apiUrl = `${process.env.NEXT_PUBLIC_WORDPRESS_API_URL}/wp-json/custom/v1/my-orders`;
-    console.log('요청 URL:', apiUrl);
-    
-    const response = await fetch(apiUrl, {
+    // 현재 세션 상태 확인
+    const sessionResponse = await fetch(`${WORDPRESS_URL}/wp-json/wp/v2/users/me`, {
       credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'X-WP-Nonce': await getNonce()
-      }
     });
+    console.log('WordPress 세션 상태:', sessionResponse.status);
+
+    const nonce = await getNonce();
+    console.log('Nonce 값:', nonce);
+    console.log('요청 URL:', `${WORDPRESS_URL}/wp-json/custom/v1/my-orders`);
+
+    const response = await fetch(
+      `${WORDPRESS_URL}/wp-json/custom/v1/my-orders`,
+      {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-WP-Nonce': nonce,
+          'Origin': process.env.NEXTAUTH_URL || 'https://ahmoostore.onrender.com',
+        },
+      }
+    );
 
     console.log('응답 상태:', response.status);
-    const responseText = await response.text();
-    console.log('원본 응답:', responseText);
-
-    let responseData;
-    try {
-      responseData = JSON.parse(responseText);
-    } catch (e) {
-      console.error('JSON 파싱 오류:', e);
-      throw new Error('서버 응답을 파싱할 수 없습니다.');
-    }
-
-    console.log('파싱된 응답 데이터:', responseData);
+    console.log('응답 헤더:', Object.fromEntries(response.headers));
 
     if (!response.ok) {
-      throw new Error(responseData.message || '주문 정보를 가져오는데 실패했습니다.');
+      const errorText = await response.text();
+      console.error('에러 응답:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
     }
 
-    if (!responseData.success || !Array.isArray(responseData.orders)) {
-      console.error('잘못된 응답 형식:', responseData);
-      throw new Error('잘못된 응답 형식입니다.');
-    }
-
-    return responseData.orders;
-  } catch (error: any) {
-    console.error('주문 조회 오류 상세:', error);
-    throw new Error('주문 정보를 가져오는데 실패했습니다. 다시 시도해주세요.');
+    const data = await response.json();
+    console.log('주문 데이터:', data);
+    
+    return data as OrdersResponse;
+  } catch (error) {
+    console.error('주문 조회 중 오류 발생:', error);
+    throw error;
   }
 }
 
