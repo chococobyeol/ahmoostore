@@ -134,6 +134,11 @@ if (!WORDPRESS_URL || !WOOCOMMERCE_URL) {
 
 export async function fetchUserOrders(): Promise<OrdersResponse> {
   try {
+    // WooCommerce API 키로 인증
+    const consumerKey = process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_KEY;
+    const consumerSecret = process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_SECRET;
+    const authString = btoa(`${consumerKey}:${consumerSecret}`);
+
     const response = await fetch(
       `${WORDPRESS_URL}/wp-json/custom/v1/my-orders`,
       {
@@ -141,6 +146,7 @@ export async function fetchUserOrders(): Promise<OrdersResponse> {
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Basic ${authString}`,
         }
       }
     );
