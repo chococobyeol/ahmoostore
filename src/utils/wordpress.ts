@@ -75,4 +75,66 @@ export const loginUser = async (credentials: LoginData): Promise<LoginResponse> 
       throw new Error('요청 설정 중 오류가 발생했습니다.');
     }
   }
-}; 
+};
+
+// WordPress nonce를 가져오는 함수 추가
+async function getNonce(): Promise<string> {
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_WORDPRESS_API_URL}/wp-json`,
+      {
+        credentials: 'include'
+      }
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch nonce');
+    }
+
+    const data = await response.json();
+    return data.nonce || '';
+  } catch (error) {
+    console.error('Nonce 가져오기 실패:', error);
+    return '';
+  }
+}
+
+export async function getUserOrders() {
+  try {
+    // nonce 없이도 동작하도록 수정
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_WORDPRESS_API_URL}/wp-json/custom/v1/my-orders`,
+      {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || '주문 정보를 가져오는데 실패했습니다.');
+    }
+
+    const data = await response.json();
+    
+    // 응답 데이터 검증
+    if (!data.success || !Array.isArray(data.orders)) {
+      throw new Error('잘못된 응답 형식입니다.');
+    }
+
+    return data.orders;
+  } catch (error: any) {
+    console.error('주문 조회 오류:', error);
+    throw new Error('주문 정보를 가져오는데 실패했습니다. 다시 시도해주세요.');
+  }
+}
+
+// 에러 처리를 위한 커스텀 에러 클래스
+export class OrderError extends Error {
+  constructor(message: string, public statusCode?: number) {
+    super(message);
+    this.name = 'OrderError';
+  }
+}

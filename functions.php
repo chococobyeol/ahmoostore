@@ -18,6 +18,14 @@ add_action('rest_api_init', function () {
         'callback' => 'update_order_status_callback',
         'permission_callback' => '__return_true'
     ));
+
+    register_rest_route('custom/v1', '/my-orders', array(
+        'methods' => 'GET',
+        'callback' => 'get_user_orders_api',
+        'permission_callback' => function() {
+            return is_user_logged_in();
+        }
+    ));
 });
 
 function register_user_api($request) {
@@ -132,6 +140,79 @@ function update_order_status_callback($request) {
     }
 }
 
+function get_user_orders_api($request) {
+    $user_id = get_current_user_id();
+    
+    // 추가 보안 검증
+    if (!$user_id || !current_user_can('read')) {
+        return new WP_Error(
+            'unauthorized',
+            '접근 권한이 없습니다.',
+            array('status' => 401)
+        );
+    }
+
+    try {
+        $args = array(
+            'customer_id' => $user_id,
+            'limit' => -1,
+            'orderby' => 'date',
+            'order' => 'DESC',
+        );
+
+        $orders = wc_get_orders($args);
+        
+        // 결과 검증
+        if (is_wp_error($orders)) {
+            throw new Exception($orders->get_error_message());
+        }
+
+        $formatted_orders = array();
+        foreach ($orders as $order) {
+            // 주문 소유자 재검증
+            if ($order->get_customer_id() !== $user_id) {
+                continue;
+            }
+            
+            $formatted_orders[] = array(
+                'id' => $order->get_id(),
+                'status' => $order->get_status(),
+                'total' => $order->get_total(),
+                'date_created' => $order->get_date_created()->format('Y-m-d H:i:s'),
+                'payment_method' => $order->get_payment_method_title(),
+                'items' => array_map(function($item) {
+                    return array(
+                        'name' => $item->get_name(),
+                        'quantity' => $item->get_quantity(),
+                        'total' => $item->get_total()
+                    );
+                }, $order->get_items())
+            );
+        }
+
+        // 로깅 추가
+        error_log(sprintf(
+            '[주문조회] 사용자 ID: %d, 조회된 주문 수: %d',
+            $user_id,
+            count($formatted_orders)
+        ));
+
+        return array(
+            'success' => true,
+            'orders' => $formatted_orders
+        );
+
+    } catch (Exception $e) {
+        error_log('[주문조회 오류] ' . $e->getMessage());
+        return new WP_Error(
+            'order_fetch_error',
+            '주문 정보를 가져오는데 실패했습니다: ' . $e->getMessage(),
+            array('status' => 500)
+        );
+    }
+}
+
+// CORS 설정 통합
 add_action('init', function() {
     if (isset($_SERVER['HTTP_ORIGIN'])) {
         header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
@@ -147,22 +228,22 @@ add_action('init', function() {
     }
 });
 
-add_action('rest_api_init', function() {
-    remove_filter('rest_pre_serve_request', 'rest_send_cors_headers');
-    add_filter('rest_pre_serve_request', function($value) {
-        if (isset($_SERVER['HTTP_ORIGIN'])) {
-            header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
-            header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
-            header("Access-Control-Allow-Headers: Content-Type, Accept, Authorization, X-Requested-With");
-            header("Access-Control-Allow-Credentials: true");
-            header("Access-Control-Max-Age: 3600");
+add_filter('woocommerce_rest_check_permissions', function($permission, $context, $object_id, $post_type) {
+    if ($post_type === 'shop_order') {
+        error_log('WooCommerce 주문 권한 체크: ' . $context);
+        
+        if (!is_user_logged_in()) {
+            return false;
         }
-        return $value;
-    });
-});
-
-add_filter('woocommerce_rest_check_permissions', function($permission, $context, $object_id, $post_type){
-    return true;
+        
+        if ($object_id) {
+            $order = wc_get_order($object_id);
+            if ($order) {
+                return $order->get_customer_id() === get_current_user_id();
+            }
+        }
+    }
+    return $permission;
 }, 10, 4);
 
 add_filter('woocommerce_rest_pre_insert_shop_order_object', function($order, $request) {
@@ -179,14 +260,6 @@ add_filter('rest_pre_dispatch', function($result, $server, $request) {
     }
     return $result;
 }, 10, 3);
-
-add_filter('woocommerce_rest_check_permissions', function($permission, $context, $object_id, $post_type) {
-    if ($post_type === 'shop_order') {
-        error_log('WooCommerce 주문 권한 체크: ' . $context);
-        return true;
-    }
-    return $permission;
-}, 10, 4);
 
 add_filter('woocommerce_rest_pre_dispatch', function($result, $server, $request) {
     if (isset($_SERVER['HTTP_ORIGIN'])) {
