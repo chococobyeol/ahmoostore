@@ -101,32 +101,33 @@ async function getNonce(): Promise<string> {
 
 export async function getUserOrders() {
   try {
-    // nonce 없이도 동작하도록 수정
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_WORDPRESS_API_URL}/wp-json/custom/v1/my-orders`,
-      {
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
+    console.log('주문 조회 시작...');
+    const apiUrl = `${process.env.NEXT_PUBLIC_WORDPRESS_API_URL}/wp-json/custom/v1/my-orders`;
+    console.log('요청 URL:', apiUrl);
+    
+    const response = await fetch(apiUrl, {
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json'
       }
-    );
+    });
+
+    console.log('응답 상태:', response.status);
+    const responseData = await response.json();
+    console.log('응답 데이터:', responseData);
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.message || '주문 정보를 가져오는데 실패했습니다.');
+      throw new Error(responseData.message || '주문 정보를 가져오는데 실패했습니다.');
     }
 
-    const data = await response.json();
-    
-    // 응답 데이터 검증
-    if (!data.success || !Array.isArray(data.orders)) {
+    if (!responseData.success || !Array.isArray(responseData.orders)) {
+      console.error('잘못된 응답 형식:', responseData);
       throw new Error('잘못된 응답 형식입니다.');
     }
 
-    return data.orders;
+    return responseData.orders;
   } catch (error: any) {
-    console.error('주문 조회 오류:', error);
+    console.error('주문 조회 오류 상세:', error);
     throw new Error('주문 정보를 가져오는데 실패했습니다. 다시 시도해주세요.');
   }
 }
