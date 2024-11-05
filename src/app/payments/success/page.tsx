@@ -1,13 +1,53 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
-import { Suspense } from 'react';
+import { Suspense, useEffect } from 'react';
+
+async function updateOrderStatus(orderId: string) {
+  try {
+    const response = await fetch(`${process.env.NEXT_PUBLIC_WORDPRESS_URL}/wp-json/custom/v1/update-order-status`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        order_id: orderId
+      }),
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('주문 상태 업데이트 실패:', errorData);
+      throw new Error('주문 상태 업데이트에 실패했습니다');
+    }
+
+    const data = await response.json();
+    console.log('주문 상태 업데이트 성공:', data);
+    return data;
+  } catch (error) {
+    console.error('주문 상태 업데이트 중 오류 발생:', error);
+    throw error;
+  }
+}
 
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderId = searchParams.get('orderId');
   const paymentKey = searchParams.get('paymentKey');
   const amount = searchParams.get('amount');
+
+  useEffect(() => {
+    if (orderId) {
+      updateOrderStatus(orderId)
+        .then(() => {
+          console.log('주문 상태가 성공적으로 업데이트되었습니다.');
+        })
+        .catch((error) => {
+          console.error('주문 상태 업데이트 실패:', error);
+        });
+    }
+  }, [orderId]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
