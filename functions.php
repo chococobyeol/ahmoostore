@@ -86,51 +86,21 @@ function update_order_status_callback($request) {
     $json = $request->get_json_params();
     $order_id = isset($json['order_id']) ? sanitize_text_field($json['order_id']) : '';
     
-    error_log('주문 상태 업데이트 시작 - 받은 데이터: ' . print_r($json, true));
+    error_log('[토스페이먼츠] 주문 상태 업데이트 시작 - Order ID: ' . $order_id);
     
     if (empty($order_id)) {
-        error_log('주문 상태 업데이트 실패: 주문 ID 없음');
         return new WP_Error('no_order_id', '주문 ID가 필요합니다.', array('status' => 400));
     }
 
     try {
-        if (!class_exists('WooCommerce')) {
-            throw new Exception('WooCommerce가 활성화되어 있지 않습니다.');
-        }
-
-        $order_id = trim(str_replace('#', '', $order_id));
-        error_log('정리된 주문 ID: ' . $order_id);
-
-        $order = wc_get_order((int)$order_id);
+        // 주문 ID 정리
+        $order_id = str_replace('#', '', $order_id);
         
-        if (!$order) {
-            error_log('주문을 찾을 수 없음 - Order ID: ' . $order_id);
-            
-            global $wpdb;
-            $post = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$wpdb->posts} WHERE ID = %d", $order_id));
-            error_log('데이터베이스 조회 결과: ' . print_r($post, true));
-            
-            return new WP_Error('invalid_order', '유효하지 않은 주문입니다.', array('status' => 404));
-        }
-
-        error_log('현재 주문 상태: ' . $order->get_status());
-
-        $order->payment_complete();
-        
-        $order->update_meta_data('_payment_method', 'tosspayments');
-        $order->update_meta_data('_payment_method_title', '토스페이먼츠');
-        $order->update_meta_data('_paid_date', current_time('mysql'));
-        
-        $order->add_order_note('토스페이먼츠 결제가 완료되었습니다.', 0, true);
-        
-        wc_reduce_stock_levels($order_id);
-        
-        $order->update_status('processing', '결제 완료 처리됨');
-        
-        $order->save();
-        
+        // 데이터베이스 직접 업데이트
         global $wpdb;
-        $wpdb->update(
+        
+        // 1. post_status 업데이트
+        $result1 = $wpdb->update(
             $wpdb->posts,
             array('post_status' => 'wc-processing'),
             array('ID' => $order_id),
@@ -138,20 +108,48 @@ function update_order_status_callback($request) {
             array('%d')
         );
         
-        error_log('주문 처리 완료 - 최종 상태: ' . $order->get_status());
+        error_log('[토스페이먼츠] posts 테이블 업데이트 결과: ' . ($result1 !== false ? 'success' : 'fail'));
+
+        // 2. 메타데이터 업데이트
+        $meta_updates = array(
+            '_payment_method' => 'tosspayments',
+            '_payment_method_title' => '토스페이먼츠',
+            '_paid_date' => current_time('mysql'),
+            '_completed_date' => current_time('mysql'),
+            '_order_status' => 'processing'
+        );
+
+        foreach ($meta_updates as $meta_key => $meta_value) {
+            update_post_meta($order_id, $meta_key, $meta_value);
+        }
         
+        // 3. 주문 노트 추가
+        $wpdb->insert(
+            $wpdb->prefix . 'comments',
+            array(
+                'comment_post_ID' => $order_id,
+                'comment_author' => 'WooCommerce',
+                'comment_content' => '토스페이먼츠 결제가 완료되었습니다.',
+                'comment_type' => 'order_note',
+                'comment_date' => current_time('mysql'),
+                'comment_date_gmt' => current_time('mysql', 1)
+            )
+        );
+
+        error_log('[토스페이먼츠] 주문 처리 완료 - Order ID: ' . $order_id);
+        
+        // 캐시 삭제
         clean_post_cache($order_id);
+        wp_cache_delete($order_id, 'posts');
         
         return array(
             'success' => true,
             'message' => '주문 상태가 업데이트되었습니다.',
-            'order_id' => $order_id,
-            'new_status' => $order->get_status()
+            'order_id' => $order_id
         );
         
     } catch (Exception $e) {
-        error_log('주문 상태 업데이트 중 오류 발생: ' . $e->getMessage());
-        error_log('오류 발생 위치: ' . $e->getTraceAsString());
+        error_log('[토스페이먼츠] 오류 발생: ' . $e->getMessage());
         return new WP_Error(
             'update_failed',
             '주문 상태 업데이트 실패: ' . $e->getMessage(),
@@ -161,9 +159,12 @@ function update_order_status_callback($request) {
 }
 
 add_action('init', function() {
-    header("Access-Control-Allow-Origin: *");
-    header("Access-Control-Allow-Methods: POST, GET, OPTIONS, PUT, DELETE");
-    header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
+    if (isset($_SERVER['HTTP_ORIGIN'])) {
+        header("Access-Control-Allow-Origin: {$_SERVER['HTTP_ORIGIN']}");
+        header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+        header("Access-Control-Allow-Headers: Content-Type");
+        header("Access-Control-Allow-Credentials: true");
+    }
     
     if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
         status_header(200);

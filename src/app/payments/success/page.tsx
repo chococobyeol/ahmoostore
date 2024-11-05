@@ -5,43 +5,25 @@ import { Suspense, useEffect, useState } from 'react';
 
 async function updateOrderStatus(orderId: string) {
   try {
-    const cleanOrderId = orderId.replace('#', '');
-    console.log('주문 상태 업데이트 시도:', cleanOrderId);
+    console.log('주문 상태 업데이트 시도:', orderId);
     
-    const response = await fetch(`${process.env.NEXT_PUBLIC_WORDPRESS_URL}/wp-json/wc/v3/orders/${cleanOrderId}`, {
-      method: 'PUT',
+    const response = await fetch(`${process.env.NEXT_PUBLIC_WORDPRESS_URL}/wp-json/custom/v1/update-order-status`, {
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
       },
       body: JSON.stringify({
-        status: 'processing'
-      }),
-      credentials: 'include'
+        order_id: orderId
+      })
     });
 
+    const data = await response.json();
+    
     if (!response.ok) {
-      const fallbackResponse = await fetch(`${process.env.NEXT_PUBLIC_WORDPRESS_URL}/wp-json/custom/v1/update-order-status`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          order_id: cleanOrderId,
-          status: 'processing'
-        }),
-        credentials: 'include'
-      });
-
-      const fallbackData = await fallbackResponse.json();
-      if (!fallbackResponse.ok) {
-        throw new Error(fallbackData.message || '주문 상태 업데이트에 실패했습니다');
-      }
-      return fallbackData;
+      console.error('주문 상태 업데이트 실패 응답:', data);
+      throw new Error(data.message || '주문 상태 업데이트에 실패했습니다');
     }
 
-    const data = await response.json();
     console.log('주문 상태 업데이트 성공:', data);
     return data;
   } catch (error) {
