@@ -54,40 +54,24 @@ interface LoginResponse {
 
 export const loginUser = async (credentials: LoginData): Promise<LoginResponse> => {
   try {
-    // 로그인 요청
     const response = await fetch(`${baseURL}/wp-json/custom/v1/login`, {
       method: 'POST',
       credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
       },
       body: JSON.stringify(credentials)
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || '로그인에 실패했습니다.');
+      throw new Error('로그인에 실패했습니다.');
     }
 
     const data = await response.json();
-    console.log('로그인 응답:', data);
-
-    // 세션 상태 확인
-    const sessionCheck = await fetch(`${baseURL}/wp-json/wp/v2/users/me`, {
-      credentials: 'include'
-    });
-
-    console.log('세션 상태:', sessionCheck.status);
-
-    if (sessionCheck.ok) {
-      return data;
-    } else {
-      throw new Error('세션 인증에 실패했습니다.');
-    }
-  } catch (error: any) {
+    return data;
+  } catch (error) {
     console.error('로그인 오류:', error);
-    throw new Error(error.message || '로그인에 실패했습니다.');
+    throw new Error('로그인에 실패했습니다. 아이디와 비밀번호를 확인해주세요.');
   }
 };
 
@@ -150,51 +134,29 @@ if (!WORDPRESS_URL || !WOOCOMMERCE_URL) {
 
 export async function fetchUserOrders(): Promise<OrdersResponse> {
   try {
-    // WooCommerce REST API 인증 정보 추가
-    const consumerKey = process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_KEY;
-    const consumerSecret = process.env.NEXT_PUBLIC_WOOCOMMERCE_ORDER_SECRET;
-    
-    if (!consumerKey || !consumerSecret) {
-      throw new Error('WooCommerce API 키가 설정되지 않았습니다.');
-    }
-
-    // Basic Auth 헤더 생성
-    const authString = btoa(`${consumerKey}:${consumerSecret}`);
-
     const response = await fetch(
       `${WORDPRESS_URL}/wp-json/custom/v1/my-orders`,
       {
+        method: 'GET',
         credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Basic ${authString}`,
-          'Origin': process.env.NEXTAUTH_URL || 'https://ahmoostore.onrender.com',
-        },
+        }
       }
     );
 
-    console.log('주문 조회 응답:', response.status);
-    console.log('응답 헤더:', Object.fromEntries(response.headers));
-
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('API 오류 응답:', errorText);
-      
       if (response.status === 401) {
-        window.location.href = '/login'; // 로그인 페이지로 리다이렉트
+        window.location.href = '/login';
         throw new Error('로그인이 필요합니다.');
       }
-      
-      throw new Error(`주문 조회 실패: ${errorText}`);
+      throw new Error('주문 조회에 실패했습니다.');
     }
 
     const data = await response.json();
-    console.log('받은 데이터:', data);
-    
     return data;
   } catch (error) {
-    console.error('주문 조회 중 오류 발생:', error);
+    console.error('주문 조회 오류:', error);
     throw error;
   }
 }
